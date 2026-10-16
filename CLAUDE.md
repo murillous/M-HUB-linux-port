@@ -13,6 +13,9 @@ Requisitos do app (decididos pelo usuário):
   protocolo mais rápido.
 - **Interface toda em inglês, com opção de trocar para português.** Strings da UI vêm de
   arquivos de tradução desde o início, nunca fixas no código.
+- **Stack: Rust + Qt 6/QML via CXX-Qt**, integrado ao KDE Plasma. Visual próprio (parecido com
+  o MCHOSE HUB), leve e rápido; **nada de Electron/WebView**. Serviço leve em segundo plano
+  (HID, bandeja) separado da janela de ajustes.
 
 Fora do escopo: **THX** (o usuário não usa), integrações de música/letras, login, outros
 produtos MCHOSE (teclados, mouses, K20, G9…). Gravação de firmware (OTA) só se o usuário pedir.

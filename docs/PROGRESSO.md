@@ -40,10 +40,21 @@ Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
    `hidraw`, conferir que a saída bate com a do Windows.
 2. Comandos de escrita (Set) com confirmação do usuário a cada um, começando pelos reversíveis:
    prompt volume (33) e trocar perfil de EQ (1); depois auto-desligamento (26) e ganhos (18).
-3. Decidir a arquitetura do app (CLI + GUI? GTK4/libadwaita, Qt…) com i18n en/pt-BR desde o início.
+3. Instalar o ambiente (Rust, MSVC Build Tools e Qt 6 no Windows; Rust e Qt 6 devel no Fedora)
+   e montar o esqueleto: workspace Cargo com crate `protocol` (porte do `v9pro2/protocol.py`
+   + testes com bytes reais) e app CXX-Qt/QML só de leitura, com i18n en/pt-BR.
 4. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
 
 ## Decisões
+
+- **2026-10-16 — Stack do app: Rust + Qt 6/QML (CXX-Qt).** Alternativas avaliadas: Slint
+  (mais leve, menos integrado ao KDE), Qt/QML em C++ (padrão do KDE, mas o usuário prefere
+  Rust), PySide6 (pesado), Tauri (WebKitGTK no Linux), GTK4/libadwaita (cara de GNOME), Flutter.
+  Motivos: integração com o KDE Plasma (o Qt é a base dele), interface própria com animações em
+  placa de vídeo, Rust no backend. Integrações KDE planejadas: bandeja (StatusNotifierItem, ex.
+  crate `ksni`), notificações freedesktop, configuração em `~/.config`. Mecanismo de i18n
+  com troca de idioma em tempo de execução: **[?]** a definir no esqueleto (`QTranslator` +
+  `retranslate()` ou tradução do lado Rust).
 
 - Não redistribuir código, DLLs ou firmware da MCHOSE no repositório — só documentar o
   protocolo e reimplementar.
