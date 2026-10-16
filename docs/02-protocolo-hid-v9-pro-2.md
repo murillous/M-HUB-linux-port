@@ -59,24 +59,50 @@ Payload da resposta = `bytes[7 .. 7 + length - 1)` **[obs]**.
 
 ## 4. Comandos de EQ / configuração (`EQ_HID_CMD`) **[obs]**
 
-| cmd | Nome | cmdType | Payload |
-|---|---|---|---|
-| 1 | SET_EQ_MODE | Set | `[mode]` (0–2 = Game 1/2/3) |
-| 4 | GET_EQ_STATE | Request | — |
-| 5 | GET_EQ_MODE_DESC | Request | `[mode]` → resposta `[mode, nome UTF-8…, 0]` |
-| 11 | GET_BATTERY_SLEEP | Request | **[?]** |
-| 12 | GET_CURRENT_EQ_MODE | Request | `[]` → `[mode]` |
-| 13 | GET_PROMPT_VOLUME | Request | **[?]** |
-| 14 | GET_AUTO_SHUTDOWN | Request | **[?]** |
-| 16 | SET_PEQ_ALL | Set | **[?]** (constante declarada) |
-| 18 | (set PEQ gains) | Set | `[mode, n, (g_hi, g_lo)×n]`, `g = round(gain_dB × 10)` int16 big-endian, gain em −12…+12 dB |
-| 24 | (set EQ mode name) | Set | `[mode, nome UTF-8 ≤ 54 bytes]` |
-| 26 | SET_AUTO_SHUTDOWN | Set | **[?]** |
-| 27 | FACTORY_RESET | Set | **[?]** — não usar sem necessidade |
-| 33 | SET_PROMPT_VOLUME | Set | **[?]** |
+Fonte: chunk `eq-*.js` do shell `cdn.mchose.com.cn/customPage/prod` (baixado em 2026-10-16).
+Inteiros de 16 bits são **big-endian**.
 
-Requests de leitura são enviados com `check = false`; os Set usam o default do builder
-(`check = false`) **[obs]**.
+| cmd | Nome | cmdType | Payload enviado | Resposta (payload) |
+|---|---|---|---|---|
+| 1 | SET_EQ_MODE | Set | `[mode]` (0–2 = Game 1/2/3) | ack Notify: `[mode]` |
+| 4 | GET_EQ_STATE | Request | `[mode, sub]` — ver §4a | ver §4a |
+| 5 | GET_EQ_MODE_DESC | Request | `[mode]` | `[mode, nome UTF-8…, 0]` |
+| 11 | GET_BATTERY_SLEEP | Request | `[]` | `[sleepState, b]`: `sleepState == 0` → dormindo; `b` bit 7 = carregando, bits 0–6 = % bateria |
+| 12 | GET_CURRENT_EQ_MODE | Request | `[]` | `[mode]` |
+| 13 | GET_PROMPT_VOLUME | Request | `[]` | `[volume]` |
+| 14 | GET_AUTO_SHUTDOWN | Request | `[]` | `[min_hi, min_lo]` — minutos ociosos; `0` = nunca |
+| 16 | SET_PEQ_ALL | Set | **[?]** (constante declarada, sem uso) | — |
+| 18 | (set PEQ gains) | Set | `[mode, n, (g_hi, g_lo)×n]`, `g = round(gain_dB × 10)` int16, −12…+12 dB | — |
+| 24 | (set EQ mode name) | Set | `[mode, nome UTF-8 ≤ 54 bytes]` | — |
+| 25 | (restaurar EQ padrão) | Set | `[mode]` | — |
+| 26 | SET_AUTO_SHUTDOWN | Set | `[min_hi, min_lo]`; a UI oferece 15, 30, 45 e 0 (nunca) | ack Notify: igual ao cmd 14 |
+| 27 | FACTORY_RESET | Set | `[target]`: 1 = headset, 2 = dongle, 3 = ambos (a UI usa 3) | — **não usar** |
+| 33 | SET_PROMPT_VOLUME | Set | `[volume]`, inteiro **1–16** | ack Notify: `[volume]` |
+
+- Requests de leitura são enviados com `check = false`; os Set usam o default do builder
+  (`check = false`) **[obs]**.
+- Set sem `waitAck` é só `sendReport`; com `waitAck` a UI espera um input report com
+  `cmdType = Notify (00 04)` e o mesmo `cmd` **[obs]**. A UI espera ack em
+  `SET_AUTO_SHUTDOWN`; nos demais manda sem esperar.
+- `GET_BATTERY_SLEEP` (11) e a notificação `BatterySleep` (34) usam o mesmo parser **[obs]**.
+
+### 4a. `GET_EQ_STATE` — sub-comandos **[obs]**
+
+Payload `[mode, sub]`. A resposta começa com `[mode, sub, …]`:
+
+| sub | Conteúdo da resposta (a partir do byte 2) |
+|---|---|
+| 255 ALL_POINTS | `totalGain` int16, `n`, byte de pacote (`total<<4 | atual`), depois `n` × 7 bytes: `fc` u16 Hz, `gain` int16 ×10, `q` u8 ×10, `type` u8, `enable` u8 |
+| 254 ALL_FC | `n`, [byte de pacote], `n` × u16 |
+| 253 ALL_GAIN | `n`, [byte de pacote], `n` × int16 ×10 |
+| 252 ALL_Q | `n`, [byte de pacote], `n` × u8 ×10 |
+| 251 ALL_TYPE | `n`, [byte de pacote], `n` × u8 |
+| 250 ALL_ENABLE | `n`, [byte de pacote], `n` × u8 (1 = ligado) |
+| 249 TOTAL_GAIN | `totalGain` int16 |
+| 0–49 | um ponto: `totalGain` int16, `n`, byte de pacote, `fc`, `gain`, `q`, `type`, `enable` |
+
+O "byte de pacote" só existe se a resposta tiver tamanho ≥ `4 + n × largura`; senão os dados
+começam no byte 3 e há um único pacote **[obs]**.
 
 ## 5. Notificações do dispositivo (cmdType `00 04`) **[obs]**
 
@@ -114,7 +140,9 @@ Tabela compartilhada entre produtos (muitas são de teclados com tela). Relevant
 ## 8. Próximos passos
 
 1. Ferramenta Linux **somente leitura** (sem Set): abrir `hidraw` do `3837:6011`, mandar
-   GET_CURRENT_EQ_MODE, GET_EQ_MODE_DESC e a consulta de versão; validar contra este doc.
+   GET_CURRENT_EQ_MODE, GET_EQ_MODE_DESC, GET_EQ_STATE, GET_BATTERY_SLEEP, GET_PROMPT_VOLUME,
+   GET_AUTO_SHUTDOWN e a consulta de versão; validar contra este doc.
 2. No Windows: Wireshark + USBPcap enquanto troca o perfil de EQ no app → confirmar bytes.
-3. Para OTA: (a) obter o shell do CDN por outra rede/VPN ou extrair do cache após abrir a tela
-   de upgrade no app; (b) analisar `G9OTA.dll` no Ghidra para ver o transporte.
+3. Para OTA (fora do escopo por ora): o shell do CDN já foi obtido (ver
+   [03](03-mapa-de-settings.md)); a tela `otherSetting` chama `electronAPI.otaDevice`, então o
+   transporte fica no processo Electron; (b) analisar `G9OTA.dll` no Ghidra para ver o transporte.

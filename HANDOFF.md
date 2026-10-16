@@ -12,11 +12,12 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 5. Ao final da sessão: atualizar `docs/PROGRESSO.md` (status/pendências) e, se mudar o fluxo,
    este arquivo. Commitar com mensagem em português, sem linha de coautoria.
 
-## Onde paramos (2026-10-16)
+## Onde paramos (2026-10-16, sessão 2)
 
-- Protocolo HID do EQ onboard e da consulta de versão extraído (não testado no hardware).
-- **Próximo passo:** encontrar o código/pacotes das telas de settings do V9 Pro 2
-  (notificação sonora, mic, playback, other). Ver pendência 1 em `docs/PROGRESSO.md`.
+- Todos os settings do escopo mapeados ([03](docs/03-mapa-de-settings.md)); payloads HID de
+  EQ, prompt volume, auto-desligamento, bateria e versão conhecidos (não testados no hardware).
+- **Próximo passo:** ferramenta somente leitura via `hidraw`/`hidapi`. Ver pendência 1 em
+  `docs/PROGRESSO.md`.
 
 ## Ambiente
 
@@ -26,7 +27,8 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
   `analyze_javascript_application` no `resources\app.asar`.
 - Wireshark (+ USBPcap) e Ghidra disponíveis no Windows; Linux para testes ainda a definir
   (WSL não serve bem para HID/USB).
-- `cdn.mchose.com.cn` não respondeu desta rede em 2026-10-16; `www.mchose.com.cn` responde.
+- `cdn.mchose.com.cn` respondeu na sessão 2 (2026-10-16). Pedir o arquivo exato: a raiz
+  `customPage/prod/` dá 404, `customPage/prod/index.html` dá 200.
 
 ## Material extraído (não está no repo)
 
@@ -56,6 +58,17 @@ Pontos de referência encontrados (nomes mudam a cada build da MCHOSE):
 - chunk `theme-*.js` (strings ofuscadas) → `buildReportData`, `CmdType`, consulta de versão
   (procure `OtaRequest`, `V9 Pro 2 ensureHidDeviceOpen`).
 - `node tools/re/extract-fns.js <bundle> <out.js> <nomes…>` extrai funções por nome.
+
+### Baixar o shell das telas do headset (customPage)
+
+```bash
+curl -sSL https://cdn.mchose.com.cn/customPage/prod/index.html -o <dir>/index.html
+python -I tools/re/crawl.py https://cdn.mchose.com.cn/customPage/prod <dir>
+```
+
+Pontos de referência: `eq-*.js` (comandos HID 0x55), `crc32-*.js` (builder do pacote e parser
+de bateria), rotas em `main-*.js` (`audio_routine`, `audio_speaker`, `audio_mic`,
+`otherSetting`).
 
 ### Baixar o SPA atual
 
