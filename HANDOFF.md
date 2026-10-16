@@ -14,10 +14,11 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 
 ## Onde paramos (2026-10-16, sessão 2)
 
-- Todos os settings do escopo mapeados ([03](docs/03-mapa-de-settings.md)); payloads HID de
-  EQ, prompt volume, auto-desligamento, bateria e versão conhecidos (não testados no hardware).
-- **Próximo passo:** ferramenta somente leitura via `hidraw`/`hidapi`. Ver pendência 1 em
-  `docs/PROGRESSO.md`.
+- Settings do escopo mapeados ([03](docs/03-mapa-de-settings.md)). Leituras HID **validadas no
+  hardware** pelo Windows com `python -m v9pro2`.
+- **Próximo passo:** rodar a mesma ferramenta no Fedora 43 (`linux/README.md`); depois os
+  primeiros Set. Ver `docs/PROGRESSO.md`.
+- Testes: `python -m unittest discover -s tests -t .`
 
 ## Ambiente
 

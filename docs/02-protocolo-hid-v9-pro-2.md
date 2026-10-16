@@ -62,6 +62,13 @@ Payload da resposta = `bytes[7 .. 7 + length - 1)` **[obs]**.
 Fonte: chunk `eq-*.js` do shell `cdn.mchose.com.cn/customPage/prod` (baixado em 2026-10-16).
 Inteiros de 16 bits são **big-endian**.
 
+**Validado no hardware (Windows, 2026-10-16, `python -m v9pro2`)**: todas as leituras
+(cmds 4, 5, 11, 12, 13, 14 e a consulta de versão) responderam como descrito. Exemplo real de
+`GET_BATTERY_SLEEP`: `aa 01 01 03 00 01 0b 01 54 5d` → acordado, sem carregar, 84 %. As
+respostas vêm com `flags = 1` (checksum ligado), mesmo com o pedido em `flags = 0`.
+A interface HID é a coleção de vendor `usage_page 0xff07 / usage 0x222`, interface 3, que
+declara input e output de 63 bytes nos reports `0x55` e `0x4D`.
+
 | cmd | Nome | cmdType | Payload enviado | Resposta (payload) |
 |---|---|---|---|---|
 | 1 | SET_EQ_MODE | Set | `[mode]` (0–2 = Game 1/2/3) | ack Notify: `[mode]` |
@@ -104,6 +111,14 @@ Payload `[mode, sub]`. A resposta começa com `[mode, sub, …]`:
 O "byte de pacote" só existe se a resposta tiver tamanho ≥ `4 + n × largura`; senão os dados
 começam no byte 3 e há um único pacote **[obs]**.
 
+**No hardware**, `ALL_POINTS` com 10 pontos chega em **2 pacotes** de 5 pontos cada, com o
+byte 5 = `0x59` e `0x5A` **[obs]**. O parser da UI (`total = b>>4`, `atual = b&15`) não casa com
+esses valores; leitura mais coerente **[inf]**: bits 7–4 = pontos neste pacote, 3–2 = total de
+pacotes, 1–0 = pacote atual (1-based). Os pacotes podem chegar atrasados, misturados com a
+resposta do pedido seguinte: casar por `[mode, sub]` e juntar até completar os `n` pontos.
+Valores observados: `type = 0` em todos os pontos, `totalGain = 0`, fc 45/100/250/400/1k/2k/4k/
+6k/8k/12k Hz.
+
 ## 5. Notificações do dispositivo (cmdType `00 04`) **[obs]**
 
 Tabela compartilhada entre produtos (muitas são de teclados com tela). Relevantes para headset:
@@ -123,8 +138,9 @@ Tabela compartilhada entre produtos (muitas são de teclados com tela). Relevant
 ### 7a. Consulta de versão — via HID **[obs]**
 - Pacote: `cmdType = OtaRequest (00 06)`, `cmd = target` (`0` = headset, `1` = dongle),
   `payload = [0x80]` (QUERY), `check = false`, report ID `0x55`.
-- Resposta: payload `[target?, 0x80, d0, d1, d2, d3]`; se os 4 bytes forem dígitos ASCII a versão
-  é a string (ex. `"0012"`), senão hex dos bytes **[obs]**.
+- Resposta: payload `[0x80, d0, d1, d2, d3]` (o target vem no byte `cmd`). Se os 4 bytes forem
+  dígitos ASCII a versão é a string; senão é o hex dos 4 bytes, **últimos 4 dígitos** **[obs]**.
+  No hardware: dongle `00 00 00 33` → `"0033"`, headset `00 00 00 31` → `"0031"`.
 - Para PID `0x6011` a UI consulta dongle (target 1) e headset (target 0, com 1 retry após 1,5 s)
   **[obs]**.
 

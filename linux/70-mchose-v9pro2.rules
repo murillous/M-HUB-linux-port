@@ -1,0 +1,2 @@
+# MCHOSE V9 Pro 2: acesso ao hidraw para o usuário logado (sem root).
+KERNEL=="hidraw*", ATTRS{idVendor}=="3837", ATTRS{idProduct}=="6010|6011", TAG+="uaccess"

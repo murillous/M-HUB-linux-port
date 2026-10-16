@@ -8,6 +8,12 @@ Windows). Converse com o usuário em português.
 Portar apenas: **EQ, volume, notificação sonora, microfone, playback settings, microphone
 settings e other settings** do V9 Pro 2.
 
+Requisitos do app (decididos pelo usuário):
+- **Plataforma alvo: Fedora 43** (notebook do usuário). O Windows serve só para validar o
+  protocolo mais rápido.
+- **Interface toda em inglês, com opção de trocar para português.** Strings da UI vêm de
+  arquivos de tradução desde o início, nunca fixas no código.
+
 Fora do escopo: **THX** (o usuário não usa), integrações de música/letras, login, outros
 produtos MCHOSE (teclados, mouses, K20, G9…). Gravação de firmware (OTA) só se o usuário pedir.
 
