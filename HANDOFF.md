@@ -19,7 +19,7 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 - **Próximo passo:** rodar no Fedora 43 (`linux/README.md`), depois os primeiros Set (começar
   pelo EQ, que já tem editor). Ver `docs/PROGRESSO.md`.
 - Testes: `cargo test --workspace` (e `python -m unittest discover -s tests -t .`).
-- App: `cargo run -p mchose-v9` (Windows precisa de `C:\Qt.10.3\msvc2022_64in` no PATH;
+- App: `cargo run -p mchose-v9` (Windows precisa de `C:\Qt\6.10.3\msvc2022_64\bin` no PATH;
   `QT_FORCE_STDERR_LOGGING=1` para ver os logs do QML). `-- --shot <pasta>` salva prints de
   todas as telas.
 
