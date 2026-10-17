@@ -1,10 +1,19 @@
 # 04 — Referência visual da UI (MCHOSE HUB → Qt/QML)
 
 Objetivo (decidido pelo usuário em 2026-10-16): a UI do port fica **o mais próxima possível do
-MCHOSE HUB**, com atenção especial ao **editor de EQ**. Assets da MCHOSE (fotos, ícones da
-iconfont, vídeos, presets oficiais) **não** são usados: ícones e ilustração do headset foram
-desenhados para o projeto (opção "A" escolhida pelo usuário); a fonte MiSans é gratuita e o app
-usa a fonte do sistema se ela não estiver instalada.
+MCHOSE HUB**, com atenção especial ao **editor de EQ**. Ícones da iconfont, vídeos e presets
+oficiais da MCHOSE não são usados: os ícones foram desenhados para o projeto. A fonte MiSans é
+gratuita e o app usa a fonte do sistema se ela não estiver instalada.
+
+**Foto do headset** (pedido do usuário, só estética): o app mostra a mesma imagem do original
+(`configCenter/static/images/v9pro2Black_78b78392b873.png`, PNG 640×640 com transparência,
+exibida a 222 px na Common e 320 px na Other). Ela **não vai para o repositório**: fica na pasta
+de dados do app (`~/.local/share/mchose-hub-port/mchose-v9/headset.png` no Linux,
+`%APPDATA%\mchose-hub-port\mchose-v9\headset.png` no Windows), instalada por
+`python tools/install-headset-image.py [arquivo.png]`. `HeadsetImage.qml` tenta o arquivo local,
+depois a URL do CDN e, se nada carregar, mostra o desenho próprio (`HeadsetArt.qml`). O CDN da
+MCHOSE fica fora do ar com frequência; na sessão 3 a imagem foi tirada do cache do MCHOSE HUB
+aberto (`fetch(url, {cache: "force-cache"})` via CDP).
 
 ## Como a referência foi obtida **[obs]**
 

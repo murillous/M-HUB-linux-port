@@ -27,3 +27,17 @@ módulo `hid` (backend libusb), para não desanexar o driver `usbhid` do headset
 python3 -m v9pro2          # resumo
 python3 -m v9pro2 --raw    # com os bytes enviados/recebidos
 ```
+
+## Visual do app (opcional)
+
+- Fonte **MiSans** (gratuita, da Xiaomi): instale em `~/.local/share/fonts` para o visual ficar
+  igual ao MCHOSE HUB; sem ela o app usa a fonte do sistema.
+- Foto do headset (é da MCHOSE, não fica no repositório):
+
+  ```bash
+  python3 tools/install-headset-image.py              # baixa do CDN da MCHOSE
+  python3 tools/install-headset-image.py headset.png  # ou copia um arquivo que você já tem
+  ```
+
+  O CDN às vezes não responde; nesse caso copie o `headset.png` de
+  `%APPDATA%\mchose-hub-port\mchose-v9\` do Windows. Sem a imagem, o app mostra um desenho próprio.
