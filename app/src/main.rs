@@ -8,6 +8,8 @@ fn main() {
     let mut app = QGuiApplication::new();
     if let Some(mut app) = app.as_mut() {
         app.as_mut().set_application_name(&QString::from("mchose-v9"));
+        // Used by QML `Settings` for the config path (~/.config/mchose-hub-port/mchose-v9.conf).
+        app.as_mut().set_organization_name(&QString::from("mchose-hub-port"));
         app.as_mut().set_application_display_name(&QString::from("MCHOSE V9 Pro 2"));
     }
     let mut engine = QQmlApplicationEngine::new();

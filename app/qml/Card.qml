@@ -1,46 +1,18 @@
 import QtQuick
-import QtQuick.Layouts
 
-// Rounded panel with a title, an optional description and free content.
+// Card inside the main panel: #1a1a1b, radius 12, padding 24.
 Rectangle {
     id: card
 
-    property string title
-    property string description
+    property int padding: Theme.gutter
     default property alias content: body.data
 
-    radius: 18
-    color: theme.surface
-    border.color: theme.border
-    border.width: 1
-    implicitHeight: column.implicitHeight + 40
+    radius: Theme.radiusPanel
+    color: Theme.card
 
-    ColumnLayout {
-        id: column
+    Item {
+        id: body
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 6
-
-        Text {
-            text: card.title
-            color: theme.text
-            font.pixelSize: 15
-            font.weight: Font.DemiBold
-        }
-        Text {
-            visible: card.description !== ""
-            text: card.description
-            color: theme.textDim
-            font.pixelSize: 12
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
-        Item {
-            id: body
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.topMargin: 10
-            implicitHeight: childrenRect.height
-        }
+        anchors.margins: card.padding
     }
 }

@@ -89,8 +89,8 @@ mod tests {
 
     #[test]
     fn fallback() {
-        assert_eq!(translate("pt_BR", "battery.title"), "Bateria");
-        assert_eq!(translate("xx", "battery.title"), "Battery");
+        assert_eq!(translate("pt_BR", "battery.charging"), "Carregando");
+        assert_eq!(translate("xx", "battery.charging"), "Charging");
         assert_eq!(translate("en", "no.such.key"), "no.such.key");
     }
 }

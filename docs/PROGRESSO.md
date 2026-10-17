@@ -1,6 +1,6 @@
 # Progresso do port
 
-Última atualização: 2026-10-16 (sessão 2)
+Última atualização: 2026-10-16 (sessão 3)
 
 Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
 
@@ -31,6 +31,11 @@ Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
 4. Shell `customPage/prod` baixado do CDN: payloads de notificação sonora, auto-desligamento,
    bateria, reset e sub-comandos do `GET_EQ_STATE`; mapa de cada setting entre HID, mixer do
    Windows e DSP THX. → [03](03-mapa-de-settings.md)
+6. **UI refeita para ficar igual ao MCHOSE HUB** (sessão 3): prints e estilos computados do app
+   original via CDP, opção do ECharts e código do editor de EQ → tokens em `Theme.qml`,
+   sidebar/painel, telas Common/Playback/Mic/Other e editor de EQ com a mesma mecânica (curva
+   suave do ECharts, gradiente que zera em 0 dB, arrasto, roda ±0,1 dB, desfazer/refazer, morph,
+   presets com sparkline). Ícones e ilustração próprios. → [04](04-referencia-visual.md)
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
@@ -43,8 +48,9 @@ Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
 3. ~~Instalar o ambiente~~ feito no Windows (Rust 1.99.1, VS Build Tools 2022, Qt 6.10.3 em
    `C:\Qt`, `QMAKE` no ambiente do usuário). Esqueleto pronto: `crates/protocol` (9 testes) e
    `app/` (CXX-Qt 0.10 + QML, leitura funcionando no hardware, en/pt-BR em `app/i18n/`).
-   Pendente: arco da bateria com artefato amarelo no início; salvar idioma escolhido; testar no
-   Fedora; bandeja (`ksni`). Original: Instalar o ambiente (Rust, MSVC Build Tools e Qt 6 no Windows; Rust e Qt 6 devel no Fedora)
+   UI refeita na sessão 3 (idioma agora salvo em `QtCore.Settings`). Pendente: testar no
+   Fedora (e instalar a fonte MiSans); bandeja (`ksni`); ligar Volume/Microfone ao mixer do
+   sistema; edição do EQ ainda só local (depende da pendência 2). Original: Instalar o ambiente (Rust, MSVC Build Tools e Qt 6 no Windows; Rust e Qt 6 devel no Fedora)
    e montar o esqueleto: workspace Cargo com crate `protocol` (porte do `v9pro2/protocol.py`
    + testes com bytes reais) e app CXX-Qt/QML só de leitura, com i18n en/pt-BR.
 4. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.

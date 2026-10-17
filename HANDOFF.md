@@ -12,14 +12,16 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 5. Ao final da sessão: atualizar `docs/PROGRESSO.md` (status/pendências) e, se mudar o fluxo,
    este arquivo. Commitar com mensagem em português, sem linha de coautoria.
 
-## Onde paramos (2026-10-16, sessão 2)
+## Onde paramos (2026-10-16, sessão 3)
 
-- Settings do escopo mapeados ([03](docs/03-mapa-de-settings.md)). Leituras HID **validadas no
-  hardware** pelo Windows com `python -m v9pro2`.
-- **Próximo passo:** rodar a mesma ferramenta no Fedora 43 (`linux/README.md`); depois os
-  primeiros Set. Ver `docs/PROGRESSO.md`.
+- UI do app refeita para ficar igual ao MCHOSE HUB, com foco no editor de EQ
+  ([04](docs/04-referencia-visual.md)). Edição ainda só local; leituras HID validadas no Windows.
+- **Próximo passo:** rodar no Fedora 43 (`linux/README.md`), depois os primeiros Set (começar
+  pelo EQ, que já tem editor). Ver `docs/PROGRESSO.md`.
 - Testes: `cargo test --workspace` (e `python -m unittest discover -s tests -t .`).
-- App: `cargo run -p mchose-v9` (Windows precisa de `C:\Qt.10.3\msvc2022_64in` no PATH).
+- App: `cargo run -p mchose-v9` (Windows precisa de `C:\Qt.10.3\msvc2022_64in` no PATH;
+  `QT_FORCE_STDERR_LOGGING=1` para ver os logs do QML). `-- --shot <pasta>` salva prints de
+  todas as telas.
 
 ## Ambiente
 
@@ -88,3 +90,5 @@ python -I tools/re/crawl.py https://www.mchose.com.cn <dir>   # baixa /assets/*.
 | `unbr.js` | descomprime brotli dos corpos copiados |
 | `extract-fns.js` | extrai definições de funções/consts por nome de um bundle minificado |
 | `crawl.py` | baixa os chunks JS de `/assets/` de um site Vite |
+| `cdp.mjs` | cliente CDP mínimo para o MCHOSE HUB aberto com `--remote-debugging-port=9333`: `eval`, `shot`, `move` |
+| `styles.js` | rodar com `cdp.mjs eval`: estilos computados + posição por classe CSS |

@@ -1,345 +1,283 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic
+import QtCore
 import MchoseV9
 
+// Window laid out like the MCHOSE HUB headset page: top bar, sidebar, rounded main panel.
 ApplicationWindow {
     id: window
-    width: 1000
-    height: 720
-    minimumWidth: 640
-    minimumHeight: 520
+    width: 1440
+    height: 840
+    minimumWidth: 1180
+    minimumHeight: 720
     visible: true
-    title: tr("app.title")
-    color: theme.background
+    title: Lang.tr("app.title")
+    color: Theme.window
+    font.family: Theme.font
 
-    QtObject {
-        id: theme
-        readonly property color background: "#0d0f14"
-        readonly property color surface: "#161a22"
-        readonly property color surfaceHi: "#1e2430"
-        readonly property color border: "#252b38"
-        readonly property color grid: "#232937"
-        readonly property color text: "#eef1f7"
-        readonly property color textDim: "#8a93a6"
-        readonly property color accent: "#5b8cff"
-        readonly property color accent2: "#9d6bff"
-        readonly property color ok: "#3ddc97"
-        readonly property color warn: "#ffb547"
-        readonly property color bad: "#ff5c7a"
-    }
-
-    I18n { id: i18n }
     Headset { id: headset }
 
-    // Reading `i18n.language` here makes every binding that calls tr() update on language change.
-    function tr(key) { return i18n.language, i18n.tr(key) }
+    Settings {
+        id: uiSettings
+        category: "ui"
+        property string language: "en"
+    }
+    Component.onCompleted: {
+        Lang.i18n.language = uiSettings.language
+        headset.refresh()
+    }
 
     readonly property var eqModes: {
         try { return JSON.parse(headset.eqJson) } catch (e) { return [] }
     }
-    property int shownEq: 0
+    property bool editorOpen: false
+    property int editorMode: 0
 
-    function eqName(i) {
-        const m = eqModes[i]
-        return m && m.name !== "" ? m.name : tr("eq.profile").arg(i + 1)
-    }
-
-    Component.onCompleted: headset.refresh()
-    Connections {
-        target: headset
-        function onEqModeChanged() { if (headset.eqMode >= 0) window.shownEq = headset.eqMode }
-    }
     Timer { interval: 60000; running: true; repeat: true; onTriggered: headset.refresh() }
 
-    ScrollView {
+    Rectangle {
+        id: root
         anchors.fill: parent
-        contentWidth: availableWidth
+        color: Theme.window
 
-        ColumnLayout {
+        // ── Top bar ──────────────────────────────────────────────────────
+        Item {
+            id: topBar
             width: parent.width
-            spacing: 18
+            height: Theme.topBarHeight
 
-            // ── Header ───────────────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 150
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0; color: "#1a2340" }
-                    GradientStop { position: 1; color: "#24173d" }
-                }
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 32
-                    anchors.rightMargin: 32
-                    spacing: 24
-
-                    ColumnLayout {
-                        spacing: 8
-                        Text {
-                            text: "V9 Pro 2"
-                            color: theme.text
-                            font.pixelSize: 32
-                            font.weight: Font.Bold
-                        }
-                        RowLayout {
-                            spacing: 8
-                            Rectangle {
-                                width: 9; height: 9; radius: 5
-                                color: headset.busy ? theme.warn : headset.connected ? theme.ok : theme.bad
-                                SequentialAnimation on opacity {
-                                    running: headset.busy; loops: Animation.Infinite
-                                    NumberAnimation { to: 0.3; duration: 500 }
-                                    NumberAnimation { to: 1; duration: 500 }
-                                }
-                            }
-                            Text {
-                                color: theme.textDim
-                                font.pixelSize: 13
-                                text: headset.busy ? tr("status.reading")
-                                    : headset.connected ? (headset.asleep ? tr("status.asleep") : tr("status.connected"))
-                                    : headset.error === "" ? "" : tr("status." + headset.error)
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    // battery ring
-                    Item {
-                        Layout.preferredWidth: 96
-                        Layout.preferredHeight: 96
-                        visible: headset.connected
-                        Canvas {
-                            id: ring
-                            anchors.fill: parent
-                            property real value: Math.max(0, headset.batteryPercent) / 100
-                            Behavior on value { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-                            onValueChanged: requestPaint()
-                            onPaint: {
-                                const ctx = getContext("2d"), r = width / 2 - 6
-                                ctx.reset()
-                                ctx.lineWidth = 8
-                                ctx.lineCap = "round"
-                                ctx.strokeStyle = "#ffffff18"
-                                ctx.beginPath(); ctx.arc(width / 2, height / 2, r, 0, 2 * Math.PI); ctx.stroke()
-                                ctx.strokeStyle = value < 0.2 ? theme.bad : theme.ok
-                                ctx.beginPath()
-                                ctx.arc(width / 2, height / 2, r, -Math.PI / 2, -Math.PI / 2 + value * 2 * Math.PI)
-                                ctx.stroke()
-                            }
-                        }
-                        Column {
-                            anchors.centerIn: parent
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: headset.batteryPercent >= 0 ? headset.batteryPercent + "%" : tr("battery.unknown")
-                                color: theme.text
-                                font.pixelSize: 20
-                                font.weight: Font.Bold
-                            }
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: headset.charging ? tr("battery.charging") : tr("battery.title")
-                                color: theme.textDim
-                                font.pixelSize: 10
-                            }
-                        }
-                    }
-
-                    ColumnLayout {
-                        spacing: 8
-                        ComboBox {
-                            id: languageBox
-                            Layout.preferredWidth: 150
-                            model: [{ code: "en", label: "English" }, { code: "pt_BR", label: "Português" }]
-                            textRole: "label"
-                            valueRole: "code"
-                            Component.onCompleted: currentIndex = indexOfValue(i18n.language)
-                            onActivated: i18n.language = currentValue
-                            ToolTip.visible: hovered
-                            ToolTip.text: tr("settings.language")
-                        }
-                        Button {
-                            Layout.preferredWidth: 150
-                            text: tr("action.refresh")
-                            enabled: !headset.busy
-                            onClicked: headset.refresh()
-                        }
-                    }
-                }
-            }
-
-            // ── Not connected ───────────────────────────────────────
             Text {
-                visible: !headset.connected && !headset.busy && headset.error !== ""
-                Layout.fillWidth: true
-                Layout.leftMargin: 32
-                Layout.rightMargin: 32
-                wrapMode: Text.WordWrap
-                color: theme.textDim
-                text: tr("status.hint") + (headset.errorDetail !== "" ? "\n" + headset.errorDetail : "")
+                x: Theme.gutter
+                anchors.verticalCenter: parent.verticalCenter
+                text: Lang.tr("app.title")
+                font.pixelSize: 16
+                font.weight: Font.DemiBold
+                color: Theme.text
             }
 
-            // ── Cards ────────────────────────────────────────────────
-            GridLayout {
-                visible: headset.connected
-                Layout.fillWidth: true
-                Layout.leftMargin: 32
-                Layout.rightMargin: 32
-                columns: window.width > 820 ? 3 : 1
-                columnSpacing: 18
-                rowSpacing: 18
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.gutter
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 32
 
-                Card {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    title: tr("prompt.title")
-                    description: tr("prompt.desc")
-                    ColumnLayout {
-                        width: parent.width
-                        spacing: 8
-                        Text {
-                            text: headset.promptVolume >= 0 ? headset.promptVolume + " / " + headset.promptVolumeMax : "—"
-                            color: theme.text
-                            font.pixelSize: 26
-                            font.weight: Font.Bold
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 6; radius: 3
-                            color: theme.surfaceHi
-                            Rectangle {
-                                height: parent.height; radius: 3
-                                width: parent.width * Math.max(0, headset.promptVolume) / headset.promptVolumeMax
-                                Behavior on width { NumberAnimation { duration: 400 } }
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0; color: theme.accent }
-                                    GradientStop { position: 1; color: theme.accent2 }
-                                }
-                            }
-                        }
-                    }
+                BarButton {
+                    icon: "refresh"
+                    tip: Lang.tr("action.refresh")
+                    spinning: headset.busy
+                    onClicked: if (!headset.busy) headset.refresh()
                 }
-
-                Card {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    title: tr("shutdown.title")
-                    description: tr("shutdown.desc")
-                    Text {
-                        text: headset.autoShutdownMin < 0 ? "—"
-                            : headset.autoShutdownMin === 0 ? tr("shutdown.never")
-                            : tr("shutdown.minutes").arg(headset.autoShutdownMin)
-                        color: theme.text
-                        font.pixelSize: 26
-                        font.weight: Font.Bold
-                    }
-                }
-
-                Card {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    title: tr("fw.title")
-                    GridLayout {
-                        columns: 2
-                        columnSpacing: 16
-                        rowSpacing: 6
-                        Text { text: tr("fw.dongle"); color: theme.textDim; font.pixelSize: 13 }
-                        Text { text: headset.firmwareDongle || "—"; color: theme.text; font.pixelSize: 13; font.family: "monospace" }
-                        Text { text: tr("fw.headset"); color: theme.textDim; font.pixelSize: 13 }
-                        Text { text: headset.firmwareHeadset || "—"; color: theme.text; font.pixelSize: 13; font.family: "monospace" }
-                    }
-                }
-            }
-
-            Card {
-                visible: headset.connected
-                Layout.fillWidth: true
-                Layout.leftMargin: 32
-                Layout.rightMargin: 32
-                title: tr("eq.title")
-                description: tr("eq.desc")
-
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 14
-
-                    Row {
-                        spacing: 8
+                BarButton {
+                    id: langButton
+                    icon: "globe"
+                    tip: Lang.tr("settings.language")
+                    onClicked: langMenu.open()
+                    McMenu {
+                        id: langMenu
+                        x: langButton.width - width
+                        y: langButton.height + 12
                         Repeater {
-                            model: 3
-                            delegate: Rectangle {
-                                required property int index
-                                readonly property bool shown: window.shownEq === index
-                                height: 34
-                                width: label.implicitWidth + 32
-                                radius: 17
-                                color: shown ? theme.accent : theme.surfaceHi
-                                border.color: headset.eqMode === index ? theme.accent : "transparent"
-                                Behavior on color { ColorAnimation { duration: 150 } }
-                                Text {
-                                    id: label
-                                    anchors.centerIn: parent
-                                    text: eqName(index) + (headset.eqMode === index ? "  •  " + tr("eq.active") : "")
-                                    color: shown ? "white" : theme.text
-                                    font.pixelSize: 13
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: window.shownEq = index
-                                }
-                            }
-                        }
-                    }
-
-                    EqCurve {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 220
-                        points: eqModes[window.shownEq] ? eqModes[window.shownEq].points : []
-                    }
-
-                    Row {
-                        spacing: 6
-                        Repeater {
-                            model: eqModes[window.shownEq] ? eqModes[window.shownEq].points : []
-                            delegate: Rectangle {
+                            model: [{ code: "en", label: "English" }, { code: "pt_BR", label: "Português (Brasil)" }]
+                            delegate: McMenuItem {
                                 required property var modelData
-                                width: 64; height: 44; radius: 8
-                                color: theme.surfaceHi
-                                Column {
-                                    anchors.centerIn: parent
-                                    Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        text: (modelData.gain > 0 ? "+" : "") + modelData.gain.toFixed(1)
-                                        color: theme.text; font.pixelSize: 12; font.weight: Font.DemiBold
-                                    }
-                                    Text {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        text: modelData.fc >= 1000 ? (modelData.fc / 1000) + "k" : modelData.fc
-                                        color: theme.textDim; font.pixelSize: 10
-                                    }
+                                text: modelData.label
+                                checked: Lang.i18n.language === modelData.code
+                                onTriggered: {
+                                    Lang.i18n.language = modelData.code
+                                    uiSettings.language = modelData.code
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            Text {
-                Layout.leftMargin: 32
-                Layout.bottomMargin: 24
-                text: tr("note.readonly")
-                color: theme.textDim
-                font.pixelSize: 11
             }
         }
+
+        Sidebar {
+            id: sidebar
+            anchors.top: topBar.bottom
+            anchors.bottom: parent.bottom
+            headset: headset
+            items: [
+                { icon: "sliders", text: Lang.tr("nav.common") },
+                { icon: "wave", text: Lang.tr("nav.playback") },
+                { icon: "mic", text: Lang.tr("nav.mic") },
+                { icon: "hexagon", text: Lang.tr("nav.other") }
+            ]
+        }
+
+        // ── Main panel ───────────────────────────────────────────────────
+        Rectangle {
+            id: panel
+            anchors.top: topBar.bottom
+            anchors.left: sidebar.right
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: Theme.gutter
+            anchors.bottomMargin: Theme.gutter
+            radius: Theme.radiusPanel
+            color: Theme.panel
+            clip: true
+
+            StackLayout {
+                anchors.fill: parent
+                currentIndex: sidebar.current
+
+                Item {
+                    CommonPage {
+                        anchors.fill: parent
+                        headset: headset
+                        modes: window.eqModes
+                        opacity: window.editorOpen ? 0 : 1
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: 200 } }
+                        onEditEq: mode => {
+                            window.editorMode = mode
+                            window.editorOpen = true
+                        }
+                    }
+                    Loader {
+                        anchors.fill: parent
+                        active: window.editorOpen
+                        opacity: window.editorOpen ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: 200 } }
+                        sourceComponent: EqEditor {
+                            modes: window.eqModes
+                            modeIndex: window.editorMode
+                            activeMode: headset.eqMode
+                            onCollapse: window.editorOpen = false
+                        }
+                    }
+                }
+
+                EffectsPage {
+                    title: Lang.tr("nav.playback")
+                    effects: [
+                        { key: "treble", intensity: true, def: 10 },
+                        { key: "bassBoost", intensity: true, def: 10 },
+                        { key: "volBalance", intensity: true, def: 0 },
+                        { key: "vocalBoost", intensity: true, def: 0 }
+                    ]
+                }
+
+                EffectsPage {
+                    title: Lang.tr("nav.mic")
+                    effects: [
+                        { key: "micLevel", intensity: true, def: 24 },
+                        { key: "micClarity", intensity: true, def: 0 },
+                        { key: "micNr", intensity: false },
+                        { key: "micMonitor", intensity: false }
+                    ]
+                }
+
+                OtherPage { headset: headset }
+            }
+
+            // Not connected
+            Rectangle {
+                anchors.fill: parent
+                visible: !headset.connected && !headset.busy && headset.error !== ""
+                color: Qt.rgba(0.08, 0.08, 0.08, 0.92)
+                MouseArea { anchors.fill: parent }
+
+                Column {
+                    anchors.centerIn: parent
+                    width: Math.min(420, parent.width - 48)
+                    spacing: 16
+                    HeadsetArt {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        size: 160
+                        opacity: 0.5
+                    }
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        text: Lang.tr("status." + headset.error)
+                        font.pixelSize: 18
+                        font.weight: Font.DemiBold
+                        color: Theme.text
+                    }
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        text: Lang.tr("status.hint") + (headset.errorDetail !== "" ? "\n" + headset.errorDetail : "")
+                        font.pixelSize: 13
+                        color: Theme.textDim
+                    }
+                    McButton {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: Lang.tr("action.refresh")
+                        onClicked: headset.refresh()
+                    }
+                }
+            }
+        }
+    }
+
+    // Dev aid: `--shot <dir>` saves a PNG of every view (for comparing with the original) and quits.
+    Timer {
+        id: shotTour
+        readonly property int argIndex: Qt.application.arguments.indexOf("--shot")
+        readonly property string dir: argIndex >= 0 ? Qt.application.arguments[argIndex + 1] : ""
+        readonly property var steps: [
+            ["common", () => { sidebar.current = 0; window.editorOpen = false }],
+            ["eq", () => { window.editorMode = Math.max(0, headset.eqMode); window.editorOpen = true }],
+            ["playback", () => { window.editorOpen = false; sidebar.current = 1 }],
+            ["mic", () => { sidebar.current = 2 }],
+            ["other", () => { sidebar.current = 3 }]
+        ]
+        property int step: -1
+        property bool grabbing: false
+        running: dir !== "" && !headset.busy && headset.connected
+        interval: 900
+        repeat: true
+        // Alternate ticks: switch view, then grab it (grabToImage renders on a later frame).
+        onTriggered: {
+            if (grabbing) {
+                root.grabToImage(r => r.saveToFile(dir + "/" + steps[step][0] + ".png"))
+            } else if (step + 1 < steps.length) {
+                steps[++step][1]()
+            } else {
+                stop()
+                Qt.quit()
+            }
+            grabbing = !grabbing
+        }
+    }
+
+    component BarButton: Item {
+        id: bb
+        property string icon
+        property string tip
+        property bool spinning: false
+        signal clicked()
+        width: 24
+        height: 24
+        Icon {
+            id: glyph
+            anchors.centerIn: parent
+            name: bb.icon
+            size: 24
+            opacity: mouse.containsMouse ? 1 : 0.85
+            RotationAnimator on rotation {
+                running: bb.spinning
+                from: 0; to: 360; duration: 900
+                loops: Animation.Infinite
+                onRunningChanged: if (!running) glyph.rotation = 0
+            }
+        }
+        MouseArea {
+            id: mouse
+            anchors.fill: parent
+            anchors.margins: -6
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: bb.clicked()
+        }
+        ToolTip.visible: mouse.containsMouse
+        ToolTip.text: bb.tip
+        ToolTip.delay: 500
     }
 }

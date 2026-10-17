@@ -10,6 +10,8 @@ const TIMEOUT: Duration = Duration::from_secs(3);
 #[derive(Debug, Default, Clone)]
 pub struct Snapshot {
     pub product: String,
+    /// USB cable (PID 0x6010) instead of the 2.4G dongle.
+    pub wired: bool,
     pub battery: Option<BatterySleep>,
     pub prompt_volume: Option<u8>,
     pub auto_shutdown_min: Option<u16>,
@@ -33,7 +35,7 @@ impl From<hidapi::HidError> for Error {
     }
 }
 
-fn open() -> Result<(HidDevice, String), Error> {
+fn open() -> Result<(HidDevice, String, bool), Error> {
     let api = HidApi::new()?;
     for info in api.device_list() {
         if info.vendor_id() != p::VID || !p::PIDS.contains(&info.product_id()) {
@@ -43,7 +45,8 @@ fn open() -> Result<(HidDevice, String), Error> {
         let mut desc = [0u8; 4096];
         if let Ok(n) = dev.get_report_descriptor(&mut desc) {
             if p::has_output_report(&desc[..n], p::REPORT_ID) {
-                return Ok((dev, info.product_string().unwrap_or("MCHOSE V9 Pro 2").to_owned()));
+                let product = info.product_string().unwrap_or("MCHOSE V9 Pro 2").to_owned();
+                return Ok((dev, product, info.product_id() == 0x6010));
             }
         }
     }
@@ -98,10 +101,11 @@ fn read_one(dev: &HidDevice, cmd_type: CmdType, cmd: u8, payload: &[u8]) -> Resu
 }
 
 pub fn read_snapshot() -> Result<Snapshot, Error> {
-    let (dev, product) = open()?;
+    let (dev, product, wired) = open()?;
     let get = |cmd| read_one(&dev, p::REQUEST, cmd, &[]);
     let mut s = Snapshot {
         product,
+        wired,
         battery: get(p::GET_BATTERY_SLEEP)?.and_then(|r| p::decode_battery_sleep(&r)),
         prompt_volume: get(p::GET_PROMPT_VOLUME)?.and_then(|r| p::decode_prompt_volume(&r)),
         auto_shutdown_min: get(p::GET_AUTO_SHUTDOWN)?.and_then(|r| p::decode_auto_shutdown(&r)),

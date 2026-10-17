@@ -17,6 +17,7 @@ pub mod qobject {
         #[qproperty(QString, error)]
         #[qproperty(QString, error_detail)]
         #[qproperty(QString, product)]
+        #[qproperty(bool, wired)]
         /// -1 = unknown.
         #[qproperty(i32, battery_percent)]
         #[qproperty(bool, charging)]
@@ -55,6 +56,7 @@ pub struct HeadsetRust {
     error: QString,
     error_detail: QString,
     product: QString,
+    wired: bool,
     battery_percent: i32,
     charging: bool,
     asleep: bool,
@@ -75,6 +77,7 @@ impl Default for HeadsetRust {
             error: QString::default(),
             error_detail: QString::default(),
             product: QString::default(),
+            wired: false,
             battery_percent: -1,
             charging: false,
             asleep: false,
@@ -125,6 +128,7 @@ impl qobject::Headset {
         this.as_mut().set_error(QString::default());
         this.as_mut().set_error_detail(QString::default());
         this.as_mut().set_product(QString::from(&s.product));
+        this.as_mut().set_wired(s.wired);
         this.as_mut().set_battery_percent(opt(s.battery.as_ref().map(|b| b.percent as i32)));
         this.as_mut().set_charging(s.battery.as_ref().is_some_and(|b| b.charging));
         this.as_mut().set_asleep(s.battery.as_ref().is_some_and(|b| b.asleep));
