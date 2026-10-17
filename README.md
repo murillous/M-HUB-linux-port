@@ -18,6 +18,56 @@ O port cobre apenas estas configurações:
 **Fora do escopo:** THX (Audio Player, instalador, serviços), integrações de música/letras,
 login, telas de teclado/mouse e qualquer outro produto MCHOSE.
 
+## Requisitos
+
+Plataforma alvo: **Fedora 43** (KDE Plasma). O app também compila no Windows, usado só para
+validar o protocolo.
+
+| O quê | Para quê | Fedora |
+|---|---|---|
+| Rust ≥ 1.85 (edition 2024) | compilar o app | `rust cargo` (ou rustup) |
+| Compilador C/C++ | CXX-Qt e `hidapi` | `gcc-c++` |
+| Qt 6 (Core, Gui, Qml, Quick, Quick Controls, Shapes) | interface | `qt6-qtbase-devel qt6-qtdeclarative-devel` |
+| libudev + pkg-config | backend `hidraw` do `hidapi` | `systemd-devel pkgconf-pkg-config` |
+| Python 3 (opcional) | ferramenta de leitura `v9pro2` e testes | já vem no Fedora |
+
+O headset usa o driver padrão `snd-usb-audio` (áudio) e `usbhid`/`hidraw` (configurações):
+nenhum driver extra.
+
+## Setup (Fedora)
+
+> Ainda não validado no Fedora; testado até aqui só no Windows.
+
+1. Instalar as dependências:
+
+   ```bash
+   sudo dnf install rust cargo gcc-c++ qt6-qtbase-devel qt6-qtdeclarative-devel \
+       systemd-devel pkgconf-pkg-config
+   ```
+
+2. Dar acesso ao hidraw do headset para o usuário logado (sem root):
+
+   ```bash
+   sudo cp linux/70-mchose-v9pro2.rules /etc/udev/rules.d/
+   sudo udevadm control --reload && sudo udevadm trigger
+   ```
+
+   Depois desconecte e reconecte o dongle (ou o cabo).
+
+3. Compilar e rodar:
+
+   ```bash
+   cargo run --release -p mchose-v9
+   ```
+
+   O CXX-Qt acha o Qt pelo `qmake6`. Se tiver mais de um Qt instalado, aponte o certo com
+   `QMAKE=/caminho/para/qmake6`. Para ver os logs do QML: `QT_FORCE_STDERR_LOGGING=1`.
+
+4. Opcional: fonte MiSans e foto do headset, ver [linux/README.md](linux/README.md#visual-do-app-opcional).
+
+Testes: `cargo test --workspace` e `python3 -m unittest discover -s tests -t .`.
+A ferramenta Python de leitura (`python3 -m v9pro2`) está em [linux/README.md](linux/README.md).
+
 ## Documentação
 
 - [Progresso](docs/PROGRESSO.md) — status atual e próximos passos
