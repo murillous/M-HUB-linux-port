@@ -18,12 +18,12 @@ Item {
 
     PageTitle { id: title; text: Lang.tr("nav.common") }
 
-    HeadsetArt {
+    HeadsetImage {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: title.bottom
         anchors.bottom: cards.top
         anchors.margins: 16
-        size: Math.min(240, height)
+        size: Math.min(222, height)
         visible: height > 100
     }
 

@@ -11,7 +11,7 @@ Item {
 
     PageTitle { id: heading; text: Lang.tr("nav.other") }
 
-    HeadsetArt {
+    HeadsetImage {
         anchors.verticalCenter: parent.verticalCenter
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: -(column.width / 2 + 16)

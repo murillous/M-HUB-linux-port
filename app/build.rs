@@ -5,7 +5,7 @@ fn main() {
     let qml = [
         "Main", "Sidebar", "CommonPage", "EffectsPage", "OtherPage", "EqEditor", "EqChart",
         "Sparkline", "PresetCard", "SoundModeRow", "EffectCard", "PageTitle", "ModeTag", "Card",
-        "McSlider", "McSwitch", "McButton", "McMenu", "McMenuItem", "Icon", "HeadsetArt",
+        "McSlider", "McSwitch", "McButton", "McMenu", "McMenuItem", "Icon", "HeadsetArt", "HeadsetImage",
     ]
     .map(|name| QmlFile::from(format!("qml/{name}.qml")));
     let singletons = ["Theme", "Lang"].map(|name| QmlFile::from(format!("qml/{name}.qml")).singleton(true));

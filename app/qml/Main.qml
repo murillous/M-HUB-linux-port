@@ -185,7 +185,7 @@ ApplicationWindow {
                     anchors.centerIn: parent
                     width: Math.min(420, parent.width - 48)
                     spacing: 16
-                    HeadsetArt {
+                    HeadsetImage {
                         anchors.horizontalCenter: parent.horizontalCenter
                         size: 160
                         opacity: 0.5

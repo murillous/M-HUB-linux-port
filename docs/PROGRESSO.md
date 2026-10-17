@@ -49,7 +49,7 @@ Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
    `C:\Qt`, `QMAKE` no ambiente do usuário). Esqueleto pronto: `crates/protocol` (9 testes) e
    `app/` (CXX-Qt 0.10 + QML, leitura funcionando no hardware, en/pt-BR em `app/i18n/`).
    UI refeita na sessão 3 (idioma agora salvo em `QtCore.Settings`). Pendente: testar no
-   Fedora (e instalar a fonte MiSans); bandeja (`ksni`); ligar Volume/Microfone ao mixer do
+   Fedora (instalar a fonte MiSans e a foto do headset com `tools/install-headset-image.py`); bandeja (`ksni`); ligar Volume/Microfone ao mixer do
    sistema; edição do EQ ainda só local (depende da pendência 2). Original: Instalar o ambiente (Rust, MSVC Build Tools e Qt 6 no Windows; Rust e Qt 6 devel no Fedora)
    e montar o esqueleto: workspace Cargo com crate `protocol` (porte do `v9pro2/protocol.py`
    + testes com bytes reais) e app CXX-Qt/QML só de leitura, com i18n en/pt-BR.
