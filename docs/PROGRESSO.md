@@ -1,6 +1,6 @@
 # Progresso do port
 
-Última atualização: 2026-10-19 (sessão 4)
+Última atualização: 2026-10-20 (sessão 5)
 
 Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI em inglês com opção de português (ver `CLAUDE.md`).
 
@@ -8,7 +8,7 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 
 | Funcionalidade | Mecanismo no Windows | Status | Onde está documentado |
 |---|---|---|---|
-| **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1) e ganhos (18) validados e no app**; nome (24) e restaurar (25) pendentes | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1), ganhos (18) e nome (24) validados e no app** (testados pelo usuário); restaurar (25) pendente | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
 | **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
 | **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
@@ -44,15 +44,21 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    Ganhos do EQ (18) validados (sem ack; conferido relendo) e ligados ao editor: grava sozinho
    400 ms depois que a curva para e ativa o perfil editado, como o app oficial. Os controles do
    app não foram clicados nos testes (o caminho HID é o mesmo do CLI validado).
+8. **Nome do perfil** (sessão 5, 2026-10-20): o usuário testou o app e confirmou que o editor
+   de EQ e o "Restaurar padrão" (curva plana) funcionam; faltava renomear. Cmd 24 validado no
+   hardware pelo CLI (`--set eq-name M:NOME`, sem ack, conferido relendo o cmd 5; nome
+   restaurado). No app: lápis ao lado do nome no cabeçalho do editor, edição inline (Enter grava,
+   Esc cancela), corte em 54 bytes UTF-8 no Rust.
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
 ## Pendências (em ordem)
 
-1. Testar as escritas pelo app (Windows e Fedora): slider da notificação, troca de modo,
-   menu do desligamento e editor de EQ.
-2. Nome do perfil (24) e restaurar EQ padrão (25), com confirmação. Hoje "Restaurar padrão"
-   no editor grava tudo em 0 dB (plano), não o EQ de fábrica do perfil.
+1. Testar pelo app o renomear perfil (Windows e Fedora). Editor de EQ e "Restaurar padrão"
+   já confirmados pelo usuário; falta confirmar slider da notificação, troca de modo e menu do
+   desligamento.
+2. Restaurar EQ de fábrica (25), com confirmação. Hoje "Restaurar padrão" no editor grava tudo
+   em 0 dB (plano), não o EQ de fábrica do perfil.
 3. Ligar os sliders Volume/Microfone ao mixer. A saturação em 15–20 % no Fedora foi resolvida
    com `linux/51-mchose-v9pro2.conf` (`api.alsa.soft-mixer = true`) + `PCM` do headset em
    100 % (README, Setup passo 3) **[obs]**.

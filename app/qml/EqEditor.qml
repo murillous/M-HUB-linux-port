@@ -18,6 +18,7 @@ Item {
     property bool canWrite: false
     signal collapse()
     signal writeGains(int mode, var gains)
+    signal writeName(int mode, string name)
 
     property var undoStack: []
     property var redoStack: []
@@ -77,7 +78,7 @@ Item {
         function onValuesChanged() { if (editor.dirty) writeTimer.restart() }
     }
 
-    onModeIndexChanged: { writeTimer.stop(); load(true) }
+    onModeIndexChanged: { writeTimer.stop(); nameField.visible = false; load(true) }
     Component.onCompleted: load(false)
 
     // Own presets for the 10 onboard bands (45 Hz … 12 kHz). Not MCHOSE's official presets.
@@ -126,11 +127,72 @@ Item {
 
             ModeTag { text: Lang.tr("mode.tag").arg(editor.modeIndex + 1) }
             Text {
+                visible: !nameField.visible
                 text: editor.modeName(editor.modeIndex)
                 font.family: Theme.font
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
                 color: Theme.text
+            }
+            // Inline rename: Enter saves, Esc or clicking elsewhere cancels.
+            TextField {
+                id: nameField
+                visible: false
+                Layout.preferredWidth: 220
+                maximumLength: 54   // the headset takes 54 UTF-8 bytes; the backend cuts longer names
+                font.family: Theme.font
+                font.pixelSize: 14
+                font.weight: Font.DemiBold
+                color: Theme.text
+                placeholderText: editor.modeName(editor.modeIndex)
+                placeholderTextColor: Theme.textFaint
+                selectionColor: Theme.accent
+                selectedTextColor: Theme.text
+                leftPadding: 8
+                rightPadding: 8
+                topPadding: 4
+                bottomPadding: 4
+                background: Rectangle {
+                    radius: 6
+                    color: Theme.row
+                    border.width: 1
+                    border.color: Theme.accent
+                }
+
+                function begin() {
+                    text = editor.mode.name
+                    visible = true
+                    forceActiveFocus()
+                    selectAll()
+                }
+                onAccepted: {
+                    const name = text.trim()
+                    visible = false
+                    if (name !== "" && name !== editor.mode.name) editor.writeName(editor.modeIndex, name)
+                }
+                Keys.onEscapePressed: visible = false
+                onActiveFocusChanged: if (!activeFocus) visible = false
+            }
+            Item {
+                visible: editor.canWrite && !nameField.visible
+                Layout.preferredWidth: 20
+                Layout.preferredHeight: 20
+                Icon {
+                    anchors.centerIn: parent
+                    name: "pencil"
+                    size: 14
+                    color: renameMouse.containsMouse ? Theme.text : Theme.textDim
+                }
+                MouseArea {
+                    id: renameMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: nameField.begin()
+                }
+                ToolTip.visible: renameMouse.containsMouse
+                ToolTip.text: Lang.tr("eq.rename")
+                ToolTip.delay: 500
             }
             Item {
                 Layout.preferredWidth: 20

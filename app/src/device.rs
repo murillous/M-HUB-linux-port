@@ -60,7 +60,7 @@ fn open() -> Result<(HidDevice, String, bool), Error> {
 /// Drops late responses and sends one packet.
 fn send(dev: &HidDevice, cmd_type: CmdType, cmd: u8, payload: &[u8]) -> Result<(), Error> {
     // Guard: only reads, the version query and the Sets built by `Write` (never reset / OTA).
-    const SETS: [u8; 4] = [p::SET_EQ_MODE, p::SET_PROMPT_VOLUME, p::SET_AUTO_SHUTDOWN, p::SET_EQ_GAINS];
+    const SETS: [u8; 5] = [p::SET_EQ_MODE, p::SET_PROMPT_VOLUME, p::SET_AUTO_SHUTDOWN, p::SET_EQ_GAINS, p::SET_EQ_NAME];
     let allowed = cmd_type == p::REQUEST
         || (cmd_type == p::OTA_REQUEST && payload == [p::OTA_QUERY])
         || (cmd_type == p::SET && SETS.contains(&cmd));
@@ -128,6 +128,11 @@ fn read_eq_state(dev: &HidDevice, mode: u8) -> Result<Option<EqState>, Error> {
     Ok(p::decode_eq_all_points(&packets))
 }
 
+fn read_eq_name(dev: &HidDevice, mode: u8) -> Result<Option<String>, Error> {
+    let desc = read_one(dev, p::REQUEST, p::GET_EQ_MODE_DESC, &[mode])?;
+    Ok(desc.and_then(|r| p::decode_eq_mode_desc(&r)).map(|d| d.name))
+}
+
 pub fn read_snapshot() -> Result<Snapshot, Error> {
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (dev, product, wired) = open()?;
@@ -142,9 +147,7 @@ pub fn read_snapshot() -> Result<Snapshot, Error> {
         ..Default::default()
     };
     for mode in 0..p::EQ_MODE_COUNT {
-        let desc = read_one(&dev, p::REQUEST, p::GET_EQ_MODE_DESC, &[mode])?
-            .and_then(|r| p::decode_eq_mode_desc(&r));
-        s.eq_names.push(desc.map(|d| d.name).unwrap_or_default());
+        s.eq_names.push(read_eq_name(&dev, mode)?.unwrap_or_default());
 
         s.eq_states.push(read_eq_state(&dev, mode)?);
     }
@@ -161,6 +164,8 @@ pub enum Written {
     Ack(Option<Vec<u8>>),
     /// EQ gains have no ack: the mode's state read back right after.
     Eq(Option<EqState>),
+    /// The mode's name read back right after.
+    Name(Option<String>),
 }
 
 /// Sends one Set.
@@ -171,6 +176,10 @@ pub fn write(w: Write) -> Result<Written, Error> {
     if let Write::EqGains { mode, .. } = w {
         send(&dev, p::SET, cmd, &payload)?;
         return Ok(Written::Eq(read_eq_state(&dev, mode)?));
+    }
+    if let Write::EqName { mode, .. } = w {
+        send(&dev, p::SET, cmd, &payload)?;
+        return Ok(Written::Name(read_eq_name(&dev, mode)?));
     }
     Ok(Written::Ack(transact(&dev, p::SET, cmd, &payload, |_| true, |ps| !ps.is_empty())?.pop()))
 }

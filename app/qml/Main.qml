@@ -153,6 +153,7 @@ ApplicationWindow {
                                 headset.setEqGainsOnDevice(mode, gains.join(","))
                                 if (headset.eqMode !== mode) headset.setEqModeOnDevice(mode)
                             }
+                            onWriteName: (mode, name) => headset.setEqNameOnDevice(mode, name)
                         }
                     }
                 }

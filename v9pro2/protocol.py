@@ -26,6 +26,7 @@ SET_EQ_MODE = 1
 SET_AUTO_SHUTDOWN = 26
 SET_PROMPT_VOLUME = 33
 SET_EQ_GAINS = 18
+SET_EQ_NAME = 24
 
 OTA_QUERY = 0x80
 OTA_HEADSET, OTA_DONGLE = 0, 1
@@ -35,6 +36,7 @@ EQ_MODE_NAMES = ("Game 1", "Game 2", "Game 3")
 PROMPT_VOLUME_MAX = 16
 EQ_GAIN_MIN_DB, EQ_GAIN_MAX_DB = -12, 12
 EQ_BANDS = 10
+EQ_NAME_MAX = 54  # bytes UTF-8, como na UI oficial
 AUTO_SHUTDOWN_CHOICES = (15, 30, 45, 0)  # minutos oferecidos pela UI; 0 = nunca
 
 
@@ -149,6 +151,15 @@ def encode_set_eq_gains(mode, gains_db):
 
 def decode_current_eq_mode(p):
     return {"mode": p[0]} if p else None
+
+
+def encode_set_eq_name(mode, name):
+    """[mode, nome UTF-8], sem terminador; 1 a EQ_NAME_MAX bytes."""
+    encode_set_eq_mode(mode)
+    raw = name.strip().encode("utf-8")
+    if not 1 <= len(raw) <= EQ_NAME_MAX or 0 in raw:
+        raise ValueError(f"nome deve ter 1-{EQ_NAME_MAX} bytes UTF-8")
+    return [mode, *raw]
 
 
 def decode_eq_mode_desc(p):

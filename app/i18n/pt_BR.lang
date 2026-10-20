@@ -33,6 +33,7 @@ eq.forward = Refazer
 eq.saveMine = Salvar em Meus presets
 eq.restoreDefaults = Restaurar padrão
 eq.collapse = Recolher
+eq.rename = Renomear perfil
 eq.bass = Graves
 eq.mid = Médios
 eq.high = Agudos

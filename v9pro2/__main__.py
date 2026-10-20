@@ -3,6 +3,7 @@
 Uso: python -m v9pro2 [--raw]
      python -m v9pro2 --set prompt-volume|eq-mode|auto-shutdown VALOR [--raw]
      python -m v9pro2 --set eq-gains MODO:G1,G2,…,G10 [--raw]   (dB, −12…+12)
+     python -m v9pro2 --set eq-name MODO:NOME [--raw]           (até 54 bytes UTF-8)
 
 Sem --set só envia as leituras de READS. Com --set envia um único comando da lista WRITES
 e relê o valor; nunca FACTORY_RESET nem OTA.
@@ -52,11 +53,15 @@ WRITES = {
     "prompt-volume": (P.SET_PROMPT_VOLUME, P.encode_set_prompt_volume, "prompt_volume"),
     "eq-mode": (P.SET_EQ_MODE, P.encode_set_eq_mode, "current_eq_mode"),
     "auto-shutdown": (P.SET_AUTO_SHUTDOWN, P.encode_set_auto_shutdown, "auto_shutdown"),
-    "eq-gains": (P.SET_EQ_GAINS, lambda v: P.encode_set_eq_gains(*v), None),
+    "eq-gains": (P.SET_EQ_GAINS, lambda v: P.encode_set_eq_gains(*v), lambda v: f"eq_state[{v[0]}]"),
+    "eq-name": (P.SET_EQ_NAME, lambda v: P.encode_set_eq_name(*v), lambda v: f"eq_mode_desc[{v[0]}]"),
 }
 
 
 def parse_value(name, text):
+    if name == "eq-name":
+        mode, label = text.split(":", 1)
+        return int(mode), label
     if name != "eq-gains":
         return int(text)
     mode, gains = text.split(":")
@@ -127,7 +132,7 @@ def write(dev, name, value, raw):
     """Envia um Set de WRITES; espera o ack Notify (se vier) e relê o valor."""
     cmd, encode, label = WRITES[name]
     payload = encode(value)
-    label = label or f"eq_state[{value[0]}]"
+    label = label(value) if callable(label) else label
     print(f"{label} before: {read(dev, label, raw)}")
     ack = transact(dev, P.SET, cmd, payload, raw=raw, ack=True)
     print("ack:", ack[0].hex(" ") if ack else "none")

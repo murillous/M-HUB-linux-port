@@ -17,10 +17,10 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 - UI rodou no Fedora 44 (relato do usuário). Primeiras escritas validadas no hardware e ligadas
   no app: notificação sonora (33), perfil de EQ (1), auto-desligamento (26) e ganhos do EQ (18,
   gravados pelo editor).
-- **Próximo passo:** usuário testar as escritas pelo app; ligar os sliders Volume/Microfone ao
-  mixer; nome do perfil (24) e restaurar EQ (25). Ver `docs/PROGRESSO.md`.
+- **Próximo passo:** usuário testar o renomear perfil pelo app; ligar os sliders
+  Volume/Microfone ao mixer; restaurar EQ de fábrica (25). Ver `docs/PROGRESSO.md`.
 - Testes: `cargo test --workspace` (e `python -m unittest discover -s tests -t .`).
-- CLI no hardware: `python -m v9pro2 [--set prompt-volume|eq-mode|auto-shutdown N | eq-gains M:G1,…,G10]` (precisa de
+- CLI no hardware: `python -m v9pro2 [--set prompt-volume|eq-mode|auto-shutdown N | eq-gains M:G1,…,G10 | eq-name M:NOME]` (precisa de
   `hidapi` num venv do scratchpad).
 - App: `cargo run -p mchose-v9` (Windows precisa de `C:\Qt\6.10.3\msvc2022_64\bin` no PATH;
   `QT_FORCE_STDERR_LOGGING=1` para ver os logs do QML). `-- --shot <pasta>` salva prints de

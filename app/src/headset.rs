@@ -51,6 +51,9 @@ pub mod qobject {
         /// `gains`: the 10 band gains in dB, comma separated (−12…+12, 0.1 steps).
         #[qinvokable]
         fn set_eq_gains_on_device(self: Pin<&mut Headset>, mode: i32, gains: &QString);
+        /// Trimmed and cut to 54 UTF-8 bytes; empty names are ignored.
+        #[qinvokable]
+        fn set_eq_name_on_device(self: Pin<&mut Headset>, mode: i32, name: &QString);
     }
 
     impl cxx_qt::Threading for Headset {}
@@ -175,13 +178,30 @@ impl qobject::Headset {
         });
     }
 
+    pub fn set_eq_name_on_device(mut self: Pin<&mut Self>, mode: i32, name: &QString) {
+        let name = protocol::eq_name(&String::from(name));
+        let Ok(mode) = u8::try_from(mode) else { return };
+        if name.is_empty() || mode >= protocol::EQ_MODE_COUNT {
+            return;
+        }
+        self.as_mut().apply_eq_name(mode, name.clone()); // shown right away, confirmed below
+        let qt_thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let result = device::write(Write::EqName { mode, name });
+            let _ = qt_thread.queue(move |mut obj| match result {
+                Ok(Written::Name(Some(name))) => obj.as_mut().apply_eq_name(mode, name),
+                _ => obj.as_mut().refresh(),
+            });
+        });
+    }
+
     /// Sends `w` on a worker thread; the ack sets the property, a failure re-reads everything.
     fn write(self: Pin<&mut Self>, w: Write) {
         let qt_thread = self.qt_thread();
         std::thread::spawn(move || {
-            let result = device::write(w);
+            let result = device::write(w.clone());
             let _ = qt_thread.queue(move |mut obj| match result {
-                Ok(Written::Ack(Some(ack))) => obj.as_mut().apply_ack(w, &ack),
+                Ok(Written::Ack(Some(ack))) => obj.as_mut().apply_ack(&w, &ack),
                 _ => obj.as_mut().refresh(),
             });
         });
@@ -197,7 +217,17 @@ impl qobject::Headset {
         self.as_mut().set_eq_json(QString::from(&json));
     }
 
-    fn apply_ack(mut self: Pin<&mut Self>, w: Write, ack: &[u8]) {
+    fn apply_eq_name(mut self: Pin<&mut Self>, mode: u8, name: String) {
+        let json = {
+            let mut rust = self.as_mut().rust_mut();
+            let Some(slot) = rust.eq_names.get_mut(mode as usize) else { return };
+            *slot = name;
+            eq_json(&rust.eq_names, &rust.eq_states)
+        };
+        self.as_mut().set_eq_json(QString::from(&json));
+    }
+
+    fn apply_ack(mut self: Pin<&mut Self>, w: &Write, ack: &[u8]) {
         match w {
             Write::PromptVolume(_) => {
                 if let Some(v) = protocol::decode_prompt_volume(ack) {
@@ -214,7 +244,7 @@ impl qobject::Headset {
                     self.as_mut().set_auto_shutdown_min(m.into());
                 }
             }
-            Write::EqGains { .. } => {}
+            Write::EqGains { .. } | Write::EqName { .. } => {}
         }
     }
 

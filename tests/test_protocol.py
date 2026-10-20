@@ -85,6 +85,13 @@ class Encode(unittest.TestCase):
         self.assertRaises(ValueError, P.encode_set_eq_gains, 2, gains[:9])
         self.assertRaises(ValueError, P.encode_set_eq_gains, 2, [12.5] + gains[1:])
 
+    def test_set_eq_name(self):
+        self.assertEqual(P.encode_set_eq_name(1, " FPS "), [1, 0x46, 0x50, 0x53])
+        self.assertEqual(len(P.encode_set_eq_name(0, "音" * 18)), 1 + 54)
+        self.assertRaises(ValueError, P.encode_set_eq_name, 0, "音" * 19)
+        self.assertRaises(ValueError, P.encode_set_eq_name, 0, "  ")
+        self.assertRaises(ValueError, P.encode_set_eq_name, 3, "x")
+
     def test_set_auto_shutdown(self):
         self.assertEqual(P.encode_set_auto_shutdown(30), [0x00, 0x1E])
         self.assertEqual(P.encode_set_auto_shutdown(0), [0, 0])

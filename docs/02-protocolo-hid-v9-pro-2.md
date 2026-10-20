@@ -75,6 +75,8 @@ gravado; a releitura confirma. Exemplos reais:
 O cmd 18 (ganhos do EQ) **não manda ack**, como no código oficial (`setPEQAllGain` usa só
 `sendReportOnce`); a releitura por `GET_EQ_STATE` mostrou o ganho novo:
 `>> aa 01 00 17 00 02 12 02 0a 00 1e 00 23 ff dd …` (perfil 2, banda 1 = 3,0 dB).
+O cmd 24 (nome do perfil) também **não manda ack**; a releitura pelo cmd 5 mostrou o nome novo, e um nome mais curto sobrescreve um mais longo sem sobras:
+`>> aa 01 00 0e 00 02 18 02 54 65 73 74 …` (perfil 2, "Teste Claude"); depois foi restaurado "官方预设-音乐" (UTF-8 multibyte).
 O app oficial grava os ganhos, depois o nome (24) e por fim ativa o perfil (1, sem esperar ack).
 Todos os valores foram restaurados depois do teste.
 A interface HID é a coleção de vendor `usage_page 0xff07 / usage 0x222`, interface 3, que
@@ -91,7 +93,7 @@ declara input e output de 63 bytes nos reports `0x55` e `0x4D`.
 | 14 | GET_AUTO_SHUTDOWN | Request | `[]` | `[min_hi, min_lo]` — minutos ociosos; `0` = nunca |
 | 16 | SET_PEQ_ALL | Set | **[?]** (constante declarada, sem uso) | — |
 | 18 | (set PEQ gains) | Set | `[mode, n, (g_hi, g_lo)×n]`, `g = round(gain_dB × 10)` int16, −12…+12 dB | sem ack; conferir relendo — **validado** |
-| 24 | (set EQ mode name) | Set | `[mode, nome UTF-8 ≤ 54 bytes]` | — |
+| 24 | (set EQ mode name) | Set | `[mode, nome UTF-8 ≤ 54 bytes]`, sem terminador | sem ack; conferir relendo o cmd 5 — **validado** |
 | 25 | (restaurar EQ padrão) | Set | `[mode]` | — |
 | 26 | SET_AUTO_SHUTDOWN | Set | `[min_hi, min_lo]`; a UI oferece 15, 30, 45 e 0 (nunca) | ack Notify: igual ao cmd 14 — **validado** |
 | 27 | FACTORY_RESET | Set | `[target]`: 1 = headset, 2 = dongle, 3 = ambos (a UI usa 3) | — **não usar** |

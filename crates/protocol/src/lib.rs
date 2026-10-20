@@ -27,6 +27,8 @@ pub const GET_AUTO_SHUTDOWN: u8 = 14;
 pub const SET_EQ_MODE: u8 = 1;
 /// No ack: confirm by reading GET_EQ_STATE back.
 pub const SET_EQ_GAINS: u8 = 18;
+/// Confirm by reading GET_EQ_MODE_DESC back.
+pub const SET_EQ_NAME: u8 = 24;
 pub const SET_AUTO_SHUTDOWN: u8 = 26;
 pub const SET_PROMPT_VOLUME: u8 = 33;
 
@@ -40,6 +42,8 @@ pub const PROMPT_VOLUME_MAX: u8 = 16;
 pub const EQ_BANDS: usize = 10;
 /// ±12 dB in tenths of dB.
 pub const EQ_GAIN_LIMIT: i16 = 120;
+/// Longest mode name in UTF-8 bytes, as in the vendor UI.
+pub const EQ_NAME_MAX: usize = 54;
 /// Minutes offered by the vendor UI; 0 = never.
 pub const AUTO_SHUTDOWN_CHOICES: [u16; 4] = [15, 30, 45, 0];
 
@@ -115,20 +119,29 @@ pub fn has_output_report(descriptor: &[u8], report_id: u8) -> bool {
     false
 }
 
-/// The only Set commands this crate builds (validated on hardware, all reversible).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The only Set commands this crate builds (all reversible).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Write {
     EqMode(u8),
     PromptVolume(u8),
     AutoShutdown(u16),
     /// Gains of every band of one mode, in tenths of dB.
     EqGains { mode: u8, tenths: [i16; EQ_BANDS] },
+    /// Name of one mode: non-empty, at most `EQ_NAME_MAX` bytes (see `eq_name`).
+    EqName { mode: u8, name: String },
+}
+
+/// Trimmed `name` cut to `EQ_NAME_MAX` bytes on a char boundary.
+pub fn eq_name(name: &str) -> String {
+    let name = name.trim();
+    let end = (0..=EQ_NAME_MAX.min(name.len())).rev().find(|&i| name.is_char_boundary(i)).unwrap_or(0);
+    name[..end].trim_end().to_owned()
 }
 
 impl Write {
     /// `(cmd, payload)` for a Set packet, or `None` if the value is out of range.
-    pub fn command(self) -> Option<(u8, Vec<u8>)> {
-        match self {
+    pub fn command(&self) -> Option<(u8, Vec<u8>)> {
+        match *self {
             Write::EqMode(m) if m < EQ_MODE_COUNT => Some((SET_EQ_MODE, vec![m])),
             Write::PromptVolume(v) if (1..=PROMPT_VOLUME_MAX).contains(&v) => {
                 Some((SET_PROMPT_VOLUME, vec![v]))
@@ -142,6 +155,11 @@ impl Write {
                 let mut payload = vec![mode, EQ_BANDS as u8];
                 payload.extend(tenths.iter().flat_map(|t| t.to_be_bytes()));
                 Some((SET_EQ_GAINS, payload))
+            }
+            Write::EqName { mode, ref name }
+                if mode < EQ_MODE_COUNT && !name.is_empty() && name.len() <= EQ_NAME_MAX && !name.contains('\0') =>
+            {
+                Some((SET_EQ_NAME, [&[mode], name.as_bytes()].concat()))
             }
             _ => None,
         }
@@ -348,9 +366,23 @@ mod tests {
         assert_eq!(build(SET, cmd, &payload, false)[..12], h("aa 01 00 17 00 02 12 02 0a 00 1e 00")[..]);
         assert_eq!(payload[6..8], [0xff, 0xdd]);
         let loud = Write::EqGains { mode: 0, tenths: [121; EQ_BANDS] };
-        for bad in [Write::EqMode(3), Write::PromptVolume(0), Write::PromptVolume(17), Write::AutoShutdown(20), loud] {
+        // sent to the headset on 2026-10-20, confirmed by reading GET_EQ_MODE_DESC back
+        let (cmd, payload) = Write::EqName { mode: 2, name: "Teste Claude".into() }.command().unwrap();
+        assert_eq!(build(SET, cmd, &payload, false)[..12], h("aa 01 00 0e 00 02 18 02 54 65 73 74")[..]);
+        let long = Write::EqName { mode: 0, name: "x".repeat(EQ_NAME_MAX + 1) };
+        let empty = Write::EqName { mode: 0, name: String::new() };
+        for bad in [Write::EqMode(3), Write::PromptVolume(0), Write::PromptVolume(17), Write::AutoShutdown(20), loud, long, empty] {
             assert_eq!(bad.command(), None);
         }
+    }
+
+    #[test]
+    fn eq_name_cut_on_char_boundary() {
+        assert_eq!(eq_name("  FPS 
+"), "FPS");
+        let cut = eq_name(&"音".repeat(20)); // 3 bytes each
+        assert_eq!(cut.len(), 54);
+        assert_eq!(eq_name(&format!("{}é", "x".repeat(53))), "x".repeat(53));
     }
 
     #[test]
