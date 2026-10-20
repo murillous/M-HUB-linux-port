@@ -46,8 +46,11 @@ python3 -m v9pro2 --set eq-gains 2:2,3.5,-3.5,5.5,1.5,3,2,2.5,1,-1   # perfil:10
   Ligado, o app cria a fonte "MCHOSE V9 Pro 2 Microphone (AI noise reduction)" e a deixa como
   microfone padrão; desligado, volta para o microfone do headset. Apps com o microfone do
   headset escolhido à mão (ex.: Discord) precisam ser trocados para a fonte nova.
-- **Retorno do microfone** liga um loopback do mic cru para o fone pedindo quantum de 64
-  amostras (1,3 ms). Para cortar também o buffer do ALSA (opcional):
+- **Retorno do microfone** liga um loopback do mic para o fone. Sem redução de ruído, ouve o
+  mic cru com quantum de 64 amostras (1,3 ms). Com redução de ruído ligada, ouve a fonte com
+  NR (para dar para perceber o efeito) com quantum de 512 (10,7 ms, já que o DeepFilterNet
+  trabalha em quadros de 10 ms): fica perto de 40 ms no total. Ao ligar ou desligar o NR, o
+  retorno troca de fonte sozinho. Para cortar também o buffer do ALSA (opcional):
 
   ```bash
   cp linux/52-mchose-v9pro2-lowlatency.conf ~/.config/wireplumber/wireplumber.conf.d/

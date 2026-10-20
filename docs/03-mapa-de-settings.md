@@ -100,8 +100,8 @@ Arquivos do driver THX no DriverStore (`thx_mchose_v9pro2_apo4.inf_*` e `thx_mch
 
 Port no Linux (`app/src/micfx.rs`): NR = plugin LADSPA oficial do DeepFilterNet (v0.5.6, modelo
 de baixa latência do mesmo projeto, ~20 ms) num `filter-chain` com fonte virtual
-`mchose_v9_mic_nr` que vira a fonte padrão; monitoramento = `module-loopback` do mic cru para o
-fone com `node.latency = 64/48000`. Cada um roda como `pipewire -c` destacado.
+`mchose_v9_mic_nr` que vira a fonte padrão; monitoramento = `module-loopback` para o fone, do
+mic cru com `node.latency = 64/48000` ou, com NR ligado, da fonte com NR com `512/48000`. Cada um roda como `pipewire -c` destacado.
 
 ### Other Settings
 

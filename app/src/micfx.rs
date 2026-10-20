@@ -61,8 +61,11 @@ const MONITOR_NODE: &str = "mchose_v9_mic_monitor";
 /// `df_set_post_filter_beta(0.04)` [obs].
 const NR_ATTEN_LIM_DB: f32 = 39.0;
 const NR_POST_FILTER_BETA: f32 = 0.04;
-/// Quantum asked for while monitoring: 64 samples at 48 kHz = 1.3 ms per graph cycle.
+/// Quantum asked for while monitoring the raw mic: 64 samples at 48 kHz = 1.3 ms per graph cycle.
 const MONITOR_LATENCY: &str = "64/48000";
+/// Monitoring through noise reduction: DeepFilterNet works on 10 ms frames (480 samples), so each
+/// cycle must leave time for a whole frame or it xruns. Adds ~20 ms to the plugin's own ~20 ms.
+const MONITOR_LATENCY_NR: &str = "512/48000";
 const PLUGIN_FILE: &str = "libdeep_filter_ladspa.so";
 
 /// Processes started by this run of the app, kept only to reap them once they exit.
@@ -165,14 +168,21 @@ fn start_noise_reduction() -> Result<(), (Fx, String)> {
     let id = start(fx, &nr_conf(&plugin, &source.name))?;
     // Apps that use the default mic get the denoised one, like the APO on Windows.
     wpctl(&["set-default", &id.to_string()]);
-    Ok(())
+    follow_noise_reduction()
 }
 
 fn stop_noise_reduction() -> Result<(), (Fx, String)> {
     if let Some(Node { id, .. }) = find_nodes().1 {
         wpctl(&["set-default", &id.to_string()]);
     }
-    stop(Fx::NoiseReduction)
+    stop(Fx::NoiseReduction)?;
+    follow_noise_reduction()
+}
+
+/// Monitoring plays what the denoised source sends while noise reduction is on, so restart it
+/// whenever noise reduction changes.
+fn follow_noise_reduction() -> Result<(), (Fx, String)> {
+    if running(Fx::Monitoring) { start_monitoring() } else { Ok(()) }
 }
 
 fn start_monitoring() -> Result<(), (Fx, String)> {
@@ -180,7 +190,12 @@ fn start_monitoring() -> Result<(), (Fx, String)> {
     let (Some(sink), Some(source)) = find_nodes() else {
         return Err((fx, "headset not found in PipeWire".into()));
     };
-    start(fx, &monitor_conf(&source.name, &sink.name)).map(|_| ())
+    let conf = if running(Fx::NoiseReduction) {
+        monitor_conf(NR_NODE, &sink.name, MONITOR_LATENCY_NR)
+    } else {
+        monitor_conf(&source.name, &sink.name, MONITOR_LATENCY)
+    };
+    start(fx, &conf).map(|_| ())
 }
 
 // ── processes ──────────────────────────────────────────────────────────────
@@ -349,9 +364,9 @@ fn nr_conf(plugin: &Path, source: &str) -> String {
     client_conf("libpipewire-module-filter-chain", &args)
 }
 
-/// Raw mic straight to the headset: no processing in the path, and every node asks for
-/// `MONITOR_LATENCY`, so the whole graph runs with that quantum while monitoring is on.
-fn monitor_conf(source: &str, sink: &str) -> String {
+/// Mic (raw or denoised) straight to the headset. Both streams ask for `latency`, so the whole
+/// graph runs with that quantum while monitoring is on.
+fn monitor_conf(source: &str, sink: &str, latency: &str) -> String {
     let args = format!(
         r#"            node.description = "MCHOSE V9 Pro 2 Microphone monitoring"
             audio.position = [ MONO ]
@@ -359,14 +374,14 @@ fn monitor_conf(source: &str, sink: &str) -> String {
                 node.name = "{MONITOR_NODE}.capture"
                 target.object = {source}
                 node.dont-fallback = true
-                node.latency = {MONITOR_LATENCY}
+                node.latency = {latency}
             }}
             playback.props = {{
                 node.name = "{MONITOR_NODE}"
                 node.description = "Microphone monitoring"
                 target.object = {sink}
                 node.dont-fallback = true
-                node.latency = {MONITOR_LATENCY}
+                node.latency = {latency}
             }}"#,
         source = quote(source),
         sink = quote(sink),
@@ -396,9 +411,12 @@ mod tests {
 
     #[test]
     fn monitor_config() {
-        let conf = monitor_conf("alsa_input.usb-x", "alsa_output.usb-x");
+        let conf = monitor_conf("alsa_input.usb-x", "alsa_output.usb-x", MONITOR_LATENCY);
         assert!(conf.contains(r#"target.object = "alsa_output.usb-x""#));
         assert_eq!(conf.matches("node.latency = 64/48000").count(), 2);
+        let conf = monitor_conf(NR_NODE, "alsa_output.usb-x", MONITOR_LATENCY_NR);
+        assert!(conf.contains(r#"target.object = "mchose_v9_mic_nr""#));
+        assert_eq!(conf.matches("node.latency = 512/48000").count(), 2);
         assert!(conf.contains("name = libpipewire-module-loopback"));
         assert_eq!(conf.matches('{').count(), conf.matches('}').count());
     }

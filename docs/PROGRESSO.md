@@ -62,7 +62,8 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    saíram do `props.dat` os parâmetros do nivelamento (compressor por nível), da clareza (EQ de
    10 bandas) e do limitador. No app (`app/src/micfx.rs`): NR com o plugin LADSPA oficial
    do DeepFilterNet (`tools/install-deepfilter.py`) num filter-chain que vira a fonte padrão;
-   retorno do mic com `module-loopback` pedindo quantum de 64 (1,3 ms) e
+   retorno do mic com `module-loopback` pedindo quantum de 64 (1,3 ms); com NR ligado ouve a
+   fonte com NR e pede 512 (pedido do usuário: ouvir o efeito, aceitando mais latência); e
    `linux/52-mchose-v9pro2-lowlatency.conf` opcional (sem modo batch, período de 64). Cada
    efeito é um `pipewire -c` destacado, com pid/log em `$XDG_RUNTIME_DIR/mchose-v9/`.
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
