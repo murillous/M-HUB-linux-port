@@ -10,7 +10,7 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 |---|---|---|---|
 | **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1) e ganhos (18) validados e no app**; nome (24) e restaurar (25) pendentes | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
-| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo **[inf]**. **Problema relatado no Fedora:** com 15–20 % o som já fica no máximo (ver pendência 3) | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
+| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
 | **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. Linux: PipeWire filter-chain/EasyEffects + `pw-loopback` | [03 §3](03-mapa-de-settings.md#mic-settings) |
 | **Playback settings** (brilho, virtual bass, volume inteligente, clareza de voz) | DSP do runtime THX no Windows | Nada em HID. Linux: PipeWire filter-chain/EasyEffects | [03 §3](03-mapa-de-settings.md#speaker-settings-playback) |
@@ -53,11 +53,9 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    menu do desligamento e editor de EQ.
 2. Nome do perfil (24) e restaurar EQ padrão (25), com confirmação. Hoje "Restaurar padrão"
    no editor grava tudo em 0 dB (plano), não o EQ de fábrica do perfil.
-3. **Volume no PipeWire saturando em 15–20 %** (relato do usuário no Fedora 44). Hipótese
-   **[inf]**: faixa de dB do controle USB mal informada → testar no WirePlumber
-   `api.alsa.ignore-dB = true` ou `api.alsa.soft-mixer = true` numa regra para o card do
-   MCHOSE. Precisa da saída de `cat /proc/asound/cards`, `amixer -c <card> contents` e
-   `wpctl status` com o fone conectado. Depois: ligar os sliders Volume/Microfone ao mixer.
+3. Ligar os sliders Volume/Microfone ao mixer. A saturação em 15–20 % no Fedora foi resolvida
+   com `linux/51-mchose-v9pro2.conf` (`api.alsa.soft-mixer = true`) + `PCM` do headset em
+   100 % (README, Setup passo 3) **[obs]**.
 4. Bandeja (`ksni`) e serviço em segundo plano.
 5. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
 

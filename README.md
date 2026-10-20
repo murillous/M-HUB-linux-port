@@ -54,7 +54,20 @@ nenhum driver extra.
 
    Depois desconecte e reconecte o dongle (ou o cabo).
 
-3. Compilar e rodar:
+3. Corrigir a curva de volume (o firmware anuncia uma faixa em dB errada e o volume chega ao
+   máximo com 15-20% do controle). O PipeWire passa a controlar o volume em software:
+
+   ```bash
+   mkdir -p ~/.config/wireplumber/wireplumber.conf.d
+   cp linux/51-mchose-v9pro2.conf ~/.config/wireplumber/wireplumber.conf.d/
+   systemctl --user restart wireplumber
+   amixer -c "$(awk '/USB-Audio - MCHOSE V9 Pro 2/ {print $1}' /proc/asound/cards)" sset PCM 100%
+   ```
+
+   O último comando deixa o volume do próprio headset em 100% (0 dB); se depois de
+   reconectar ele voltar baixo, rode-o de novo.
+
+4. Compilar e rodar:
 
    ```bash
    cargo run --release -p mchose-v9
@@ -63,7 +76,7 @@ nenhum driver extra.
    O CXX-Qt acha o Qt pelo `qmake6`. Se tiver mais de um Qt instalado, aponte o certo com
    `QMAKE=/caminho/para/qmake6`. Para ver os logs do QML: `QT_FORCE_STDERR_LOGGING=1`.
 
-4. Opcional: fonte MiSans e foto do headset, ver [linux/README.md](linux/README.md#visual-do-app-opcional).
+5. Opcional: fonte MiSans e foto do headset, ver [linux/README.md](linux/README.md#visual-do-app-opcional).
 
 Testes: `cargo test --workspace` e `python3 -m unittest discover -s tests -t .`.
 A ferramenta Python de leitura (`python3 -m v9pro2`) está em [linux/README.md](linux/README.md).
