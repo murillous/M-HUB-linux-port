@@ -29,6 +29,7 @@ validar o protocolo.
 | Compilador C/C++ | CXX-Qt e `hidapi` | `gcc-c++` |
 | Qt 6 (Core, Gui, Qml, Quick, Quick Controls, Shapes) | interface | `qt6-qtbase-devel qt6-qtdeclarative-devel` |
 | libudev + pkg-config | backend `hidraw` do `hidapi` | `systemd-devel pkgconf-pkg-config` |
+| PipeWire + WirePlumber (`pw-dump`, `wpctl`) | sliders de volume e microfone | `pipewire-utils wireplumber` (já vêm no Fedora) |
 | Python 3 (opcional) | ferramenta de leitura `v9pro2` e testes | já vem no Fedora |
 
 O headset usa o driver padrão `snd-usb-audio` (áudio) e `usbhid`/`hidraw` (configurações):

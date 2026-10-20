@@ -17,6 +17,7 @@ ApplicationWindow {
     font.family: Theme.font
 
     Headset { id: headset }
+    Mixer { id: mixer }
 
     Settings {
         id: uiSettings
@@ -26,6 +27,7 @@ ApplicationWindow {
     Component.onCompleted: {
         Lang.i18n.language = uiSettings.language
         headset.refresh()
+        mixer.refresh()
     }
 
     readonly property var eqModes: {
@@ -34,7 +36,14 @@ ApplicationWindow {
     property bool editorOpen: false
     property int editorMode: 0
 
-    Timer { interval: 60000; running: true; repeat: true; onTriggered: headset.refresh() }
+    Timer { interval: 60000; running: true; repeat: true; onTriggered: { headset.refresh(); mixer.refresh() } }
+    // Follows volume changes made elsewhere (KDE applet, media keys) while the window is in use.
+    Timer {
+        interval: 1500
+        repeat: true
+        running: Qt.application.state === Qt.ApplicationActive
+        onTriggered: mixer.poll()
+    }
 
     Rectangle {
         id: root
@@ -66,7 +75,7 @@ ApplicationWindow {
                     icon: "refresh"
                     tip: Lang.tr("action.refresh")
                     spinning: headset.busy
-                    onClicked: if (!headset.busy) headset.refresh()
+                    onClicked: { if (!headset.busy) headset.refresh(); mixer.refresh() }
                 }
                 BarButton {
                     id: langButton
@@ -128,6 +137,7 @@ ApplicationWindow {
                     CommonPage {
                         anchors.fill: parent
                         headset: headset
+                        mixer: mixer
                         modes: window.eqModes
                         opacity: window.editorOpen ? 0 : 1
                         visible: opacity > 0

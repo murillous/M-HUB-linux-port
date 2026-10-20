@@ -349,6 +349,7 @@ dependencies = [
  "cxx-qt-build",
  "cxx-qt-lib",
  "hidapi",
+ "serde_json",
  "v9pro2-protocol",
 ]
 

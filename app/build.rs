@@ -14,6 +14,6 @@ fn main() {
         .qml_files(singletons)
         .qml_file("qml/eqpath.js");
     CxxQtBuilder::new_qml_module(module)
-        .files(["src/headset.rs", "src/i18n.rs"])
+        .files(["src/headset.rs", "src/i18n.rs", "src/mixer.rs"])
         .build();
 }

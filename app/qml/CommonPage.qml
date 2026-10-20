@@ -8,6 +8,7 @@ Item {
     id: page
 
     required property Headset headset
+    required property Mixer mixer
     required property var modes
     signal editEq(int mode)
 
@@ -49,10 +50,16 @@ Item {
 
                 LevelRow {
                     title: Lang.tr("common.volume")
-                    icon: "speaker"
+                    icon: page.mixer.outputMuted ? "speakerMuted" : "speaker"
+                    iconTip: Lang.tr(page.mixer.outputMuted ? "common.unmute" : "common.mute")
+                    muted: page.mixer.outputMuted
                     from: 0; to: 100
-                    value: -1
-                    tip: Lang.tr("common.mixerSoon")
+                    value: page.mixer.outputVolume
+                    editable: value >= 0
+                    settleMs: 60
+                    tip: value < 0 ? Lang.tr("common.mixerMissing") : ""
+                    onEdited: v => page.mixer.setVolume(false, v)
+                    onIconClicked: page.mixer.toggleMute(false)
                 }
                 LevelRow {
                     Layout.topMargin: 38
@@ -66,10 +73,16 @@ Item {
                 LevelRow {
                     Layout.topMargin: 38
                     title: Lang.tr("common.microphone")
-                    icon: "mic"
+                    icon: page.mixer.inputMuted ? "micMuted" : "mic"
+                    iconTip: Lang.tr(page.mixer.inputMuted ? "common.unmute" : "common.mute")
+                    muted: page.mixer.inputMuted
                     from: 0; to: 100
-                    value: -1
-                    tip: Lang.tr("common.mixerSoon")
+                    value: page.mixer.inputVolume
+                    editable: value >= 0
+                    settleMs: 60
+                    tip: value < 0 ? Lang.tr("common.mixerMissing") : ""
+                    onEdited: v => page.mixer.setVolume(true, v)
+                    onIconClicked: page.mixer.toggleMute(true)
                 }
             }
         }
@@ -132,8 +145,13 @@ Item {
         property real to
         property real value: -1
         property bool editable: false
+        /// Icon clickable (mute toggle) when `iconTip` is set; `muted` dims the bar.
+        property string iconTip
+        property bool muted: false
         /// Sent once the slider rests (debounced), so dragging doesn't flood the headset.
+        property int settleMs: 250
         signal edited(int value)
+        signal iconClicked()
 
         Layout.fillWidth: true
         spacing: 18
@@ -162,7 +180,12 @@ Item {
                 visible: row.icon !== ""
                 name: row.icon
                 size: 20
-                color: Theme.accent
+                color: row.muted ? Theme.textDim : Theme.accent
+                HoverHandler { id: iconHover; enabled: row.iconTip !== "" && row.editable; cursorShape: Qt.PointingHandCursor }
+                TapHandler { enabled: row.iconTip !== "" && row.editable; onTapped: row.iconClicked() }
+                ToolTip.visible: iconHover.hovered
+                ToolTip.text: row.iconTip
+                ToolTip.delay: 500
             }
         }
         RowLayout {
@@ -172,11 +195,11 @@ Item {
                 id: slider
                 Layout.fillWidth: true
                 enabled: row.editable
-                opacity: 1
                 stepSize: 1
                 snapMode: Slider.SnapAlways
                 onMoved: settle.restart()
                 dim: row.value < 0
+                opacity: row.muted ? 0.5 : 1
                 from: row.from
                 to: row.to
                 value: Math.max(row.from, row.value)
@@ -195,7 +218,7 @@ Item {
         }
         Timer {
             id: settle
-            interval: 250
+            interval: row.settleMs
             onTriggered: if (Math.round(slider.value) !== row.value) row.edited(Math.round(slider.value))
         }
     }

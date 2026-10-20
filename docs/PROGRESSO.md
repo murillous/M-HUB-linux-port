@@ -10,7 +10,7 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 |---|---|---|---|
 | **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1), ganhos (18) e nome (24) validados e no app** (testados pelo usuário); restaurar (25) pendente | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
-| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
+| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]**. **Sliders e mudo ligados no app** (`pw-dump` + `wpctl`); falta testar no Fedora | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
 | **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. Linux: PipeWire filter-chain/EasyEffects + `pw-loopback` | [03 §3](03-mapa-de-settings.md#mic-settings) |
 | **Playback settings** (brilho, virtual bass, volume inteligente, clareza de voz) | DSP do runtime THX no Windows | Nada em HID. Linux: PipeWire filter-chain/EasyEffects | [03 §3](03-mapa-de-settings.md#speaker-settings-playback) |
@@ -49,21 +49,26 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    hardware pelo CLI (`--set eq-name M:NOME`, sem ack, conferido relendo o cmd 5; nome
    restaurado). No app: lápis ao lado do nome no cabeçalho do editor, edição inline (Enter grava,
    Esc cancela), corte em 54 bytes UTF-8 no Rust.
+9. **Volume e microfone** (sessão 5): o usuário confirmou o renomear no Fedora. Sliders
+   Volume/Microfone ligados ao PipeWire (`app/src/mixer.rs`): acha os nós do headset no
+   `pw-dump` (`node.name` com `MCHOSE_V9_Pro_2`, `Audio/Sink` e `Audio/Source`), lê e grava com
+   `wpctl get-volume`/`set-volume` (mesma escala em % do applet do KDE, limitado a 100 %),
+   clique no ícone alterna o mudo. Relê a cada 1,5 s com a janela ativa para acompanhar
+   mudanças feitas fora do app. A saturação em 15–20 % foi resolvida antes com
+   `linux/51-mchose-v9pro2.conf` + `PCM` em 100 % **[obs]**.
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
 ## Pendências (em ordem)
 
-1. Testar pelo app o renomear perfil (Windows e Fedora). Editor de EQ e "Restaurar padrão"
-   já confirmados pelo usuário; falta confirmar slider da notificação, troca de modo e menu do
-   desligamento.
+1. Testar no Fedora os sliders Volume/Microfone e o mudo (clique no ícone), inclusive se
+   acompanham o volume mudado pelo applet do KDE. Renomear perfil, editor de EQ e "Restaurar
+   padrão" já confirmados pelo usuário; falta confirmar slider da notificação, troca de modo e
+   menu do desligamento.
 2. Restaurar EQ de fábrica (25), com confirmação. Hoje "Restaurar padrão" no editor grava tudo
    em 0 dB (plano), não o EQ de fábrica do perfil.
-3. Ligar os sliders Volume/Microfone ao mixer. A saturação em 15–20 % no Fedora foi resolvida
-   com `linux/51-mchose-v9pro2.conf` (`api.alsa.soft-mixer = true`) + `PCM` do headset em
-   100 % (README, Setup passo 3) **[obs]**.
-4. Bandeja (`ksni`) e serviço em segundo plano.
-5. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
+3. Bandeja (`ksni`) e serviço em segundo plano.
+4. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
 
 Ambiente pronto no Windows: Rust 1.99.1, VS Build Tools 2022, Qt 6.10.3 em `C:\Qt`. O
 `hidapi` do Python não fica instalado: criar um venv no scratchpad
