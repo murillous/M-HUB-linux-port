@@ -22,11 +22,17 @@ GET_CURRENT_EQ_MODE = 12
 GET_PROMPT_VOLUME = 13
 GET_AUTO_SHUTDOWN = 14
 
+SET_EQ_MODE = 1
+SET_AUTO_SHUTDOWN = 26
+SET_PROMPT_VOLUME = 33
+
 OTA_QUERY = 0x80
 OTA_HEADSET, OTA_DONGLE = 0, 1
 
 EQ_ALL_POINTS = 255
 EQ_MODE_NAMES = ("Game 1", "Game 2", "Game 3")
+PROMPT_VOLUME_MAX = 16
+AUTO_SHUTDOWN_CHOICES = (15, 30, 45, 0)  # minutos oferecidos pela UI; 0 = nunca
 
 
 def _checksum(flags, length, cmd_type, cmd, payload):
@@ -105,6 +111,24 @@ def decode_auto_shutdown(p):
         return None
     minutes = (p[0] << 8) | p[1]
     return {"minutes": minutes, "never": minutes == 0}
+
+
+def encode_set_eq_mode(mode):
+    if mode not in range(len(EQ_MODE_NAMES)):
+        raise ValueError("mode deve ser 0-2")
+    return [mode]
+
+
+def encode_set_prompt_volume(volume):
+    if not 1 <= volume <= PROMPT_VOLUME_MAX:
+        raise ValueError(f"volume deve ser 1-{PROMPT_VOLUME_MAX}")
+    return [volume]
+
+
+def encode_set_auto_shutdown(minutes):
+    if minutes not in AUTO_SHUTDOWN_CHOICES:
+        raise ValueError(f"minutos deve ser um de {AUTO_SHUTDOWN_CHOICES}")
+    return [minutes >> 8, minutes & 0xFF]
 
 
 def decode_current_eq_mode(p):

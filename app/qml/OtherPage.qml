@@ -9,6 +9,10 @@ Item {
 
     required property Headset headset
 
+    function shutdownLabel(min) {
+        return min < 0 ? Theme.dash : min === 0 ? Lang.tr("shutdown.never") : Lang.tr("shutdown.minutes").arg(min)
+    }
+
     PageTitle { id: heading; text: Lang.tr("nav.other") }
 
     HeadsetImage {
@@ -41,16 +45,36 @@ Item {
                     ToolTip.text: Lang.tr("shutdown.desc")
                 }
                 Item { Layout.fillWidth: true }
-                Text {
-                    text: Lang.tr("other.smartPowerOff") + "  "
-                        + (page.headset.autoShutdownMin < 0 ? Theme.dash
-                           : page.headset.autoShutdownMin === 0 ? Lang.tr("shutdown.never")
-                           : Lang.tr("shutdown.minutes").arg(page.headset.autoShutdownMin))
-                    font.family: Theme.font
-                    font.pixelSize: 14
-                    color: Theme.text
+                RowLayout {
+                    id: shutdownPicker
+                    spacing: 6
+                    Text {
+                        text: Lang.tr("other.smartPowerOff") + "  " + page.shutdownLabel(page.headset.autoShutdownMin)
+                        font.family: Theme.font
+                        font.pixelSize: 14
+                        color: Theme.text
+                    }
+                    Icon { name: "chevronDown"; size: 14; color: Theme.textDim }
+                    TapHandler {
+                        enabled: page.headset.connected
+                        onTapped: shutdownMenu.open()
+                    }
+                    HoverHandler { cursorShape: page.headset.connected ? Qt.PointingHandCursor : Qt.ArrowCursor }
+                    McMenu {
+                        id: shutdownMenu
+                        x: shutdownPicker.width - width
+                        y: shutdownPicker.height + 8
+                        Repeater {
+                            model: [15, 30, 45, 0]
+                            delegate: McMenuItem {
+                                required property int modelData
+                                text: page.shutdownLabel(modelData)
+                                checked: page.headset.autoShutdownMin === modelData
+                                onTriggered: if (!checked) page.headset.setAutoShutdownOnDevice(modelData)
+                            }
+                        }
+                    }
                 }
-                Icon { name: "chevronDown"; size: 14; color: Theme.textDim }
             }
         }
 

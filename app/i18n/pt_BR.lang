@@ -9,7 +9,7 @@ status.hint = Conecte o dongle e ligue o headset. No Linux, instale a regra udev
 action.refresh = Atualizar
 settings.language = Idioma
 battery.charging = Carregando
-note.readonly = Prévia: as configurações são lidas do headset, mas as mudanças ainda não são enviadas.
+note.readonly = Prévia: modo de som, notificação sonora e desligamento já são gravados no headset; a edição do EQ ainda não é enviada.
 
 nav.common = Parâmetros gerais
 nav.playback = Reprodução

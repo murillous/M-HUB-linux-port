@@ -9,7 +9,7 @@ status.hint = Plug in the dongle and turn the headset on. On Linux, install the 
 action.refresh = Refresh
 settings.language = Language
 battery.charging = Charging
-note.readonly = Preview: settings are read from the headset, but changes are not sent to it yet.
+note.readonly = Preview: sound mode, notification volume and power off are saved to the headset; EQ edits are not sent yet.
 
 nav.common = Common parameters
 nav.playback = Playback settings

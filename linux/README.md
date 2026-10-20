@@ -1,7 +1,7 @@
 # Fedora (alvo principal)
 
-Testado até aqui só no Windows; os passos abaixo são para o Fedora 43 e ainda não foram
-validados nele.
+O app (UI + leitura HID) já foi testado pelo usuário no Fedora 44 (2026-10-19). As escritas
+foram validadas no Windows.
 
 ## Permissão no hidraw
 
@@ -21,12 +21,17 @@ pip install hidapi==0.14.0.post4
 No Linux a ferramenta usa o módulo `hidraw` do pacote `hidapi` (backend do kernel), não o
 módulo `hid` (backend libusb), para não desanexar o driver `usbhid` do headset.
 
-## Leitura das configurações (somente leitura)
+## Leitura e escrita pela linha de comando
 
 ```bash
-python3 -m v9pro2          # resumo
+python3 -m v9pro2          # resumo (só leituras)
 python3 -m v9pro2 --raw    # com os bytes enviados/recebidos
+python3 -m v9pro2 --set prompt-volume 10   # 1–16
+python3 -m v9pro2 --set eq-mode 1          # 0–2
+python3 -m v9pro2 --set auto-shutdown 30   # 15, 30, 45 ou 0 (nunca)
 ```
+
+`--set` envia um único comando de uma lista fechada e relê o valor; nunca reset nem OTA.
 
 ## Visual do app (opcional)
 

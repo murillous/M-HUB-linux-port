@@ -1,20 +1,20 @@
 # Progresso do port
 
-Última atualização: 2026-10-16 (sessão 3)
+Última atualização: 2026-10-19 (sessão 4)
 
-Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
+Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI em inglês com opção de português (ver `CLAUDE.md`).
 
 ## Status por funcionalidade do escopo
 
 | Funcionalidade | Mecanismo no Windows | Status | Onde está documentado |
 |---|---|---|---|
-| **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | **Leitura validada no hardware** (Windows); escrita não testada | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (cmd 1) validada e no app**; ganhos (18) não testados | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
-| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo, sem código próprio **[inf]** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
-| **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura validada**; escrita não testada | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo **[inf]**. **Problema relatado no Fedora:** com 15–20 % o som já fica no máximo (ver pendência 3) | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
+| **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. Linux: PipeWire filter-chain/EasyEffects + `pw-loopback` | [03 §3](03-mapa-de-settings.md#mic-settings) |
 | **Playback settings** (brilho, virtual bass, volume inteligente, clareza de voz) | DSP do runtime THX no Windows | Nada em HID. Linux: PipeWire filter-chain/EasyEffects | [03 §3](03-mapa-de-settings.md#speaker-settings-playback) |
-| **Other settings**: auto-desligamento | HID `GET/SET_AUTO_SHUTDOWN` (14/26), u16 minutos | **Leitura validada**; escrita não testada | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **Other settings**: auto-desligamento | HID `GET/SET_AUTO_SHUTDOWN` (14/26), u16 minutos | **Leitura e escrita validadas**; no app (menu 15/30/45/nunca) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Other settings**: bateria / dormindo | HID `GET_BATTERY_SLEEP` (11) + notify 34 | **Leitura validada** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Other settings**: restaurar padrões | HID `FACTORY_RESET` (27) | Payload conhecido — **não usar** sem confirmação | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | Versão de firmware (leitura) | HID `OtaRequest` + `0x80` | **Validado** (dongle `0033`, headset `0031`) | [02 §7a](02-protocolo-hid-v9-pro-2.md#7a-consulta-de-versão--via-hid-obs) |
@@ -36,24 +36,31 @@ Alvo: **Fedora 43**. UI em inglês com opção de português (ver `CLAUDE.md`).
    sidebar/painel, telas Common/Playback/Mic/Other e editor de EQ com a mesma mecânica (curva
    suave do ECharts, gradiente que zera em 0 dB, arrasto, roda ±0,1 dB, desfazer/refazer, morph,
    presets com sparkline). Ícones e ilustração próprios. → [04](04-referencia-visual.md)
+7. **Primeiras escritas** (sessão 4, 2026-10-19): o usuário rodou a UI no Fedora 44 com sucesso.
+   Validados no hardware (Windows) os Set de prompt volume (33), perfil de EQ (1) e
+   auto-desligamento (26), com ack Notify e releitura; valores restaurados. Ligados no app:
+   slider da notificação (com debounce), clique na linha do modo de som, menu do desligamento.
+   `python -m v9pro2 --set …` para testes pela linha de comando.
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
 ## Pendências (em ordem)
 
-1. **Rodar `python -m v9pro2` no Fedora 43** (ver `linux/README.md`): regra udev, módulo
-   `hidraw`, conferir que a saída bate com a do Windows.
-2. Comandos de escrita (Set) com confirmação do usuário a cada um, começando pelos reversíveis:
-   prompt volume (33) e trocar perfil de EQ (1); depois auto-desligamento (26) e ganhos (18).
-3. ~~Instalar o ambiente~~ feito no Windows (Rust 1.99.1, VS Build Tools 2022, Qt 6.10.3 em
-   `C:\Qt`, `QMAKE` no ambiente do usuário). Esqueleto pronto: `crates/protocol` (9 testes) e
-   `app/` (CXX-Qt 0.10 + QML, leitura funcionando no hardware, en/pt-BR em `app/i18n/`).
-   UI refeita na sessão 3 (idioma agora salvo em `QtCore.Settings`). Pendente: testar no
-   Fedora (instalar a fonte MiSans e a foto do headset com `tools/install-headset-image.py`); bandeja (`ksni`); ligar Volume/Microfone ao mixer do
-   sistema; edição do EQ ainda só local (depende da pendência 2). Original: Instalar o ambiente (Rust, MSVC Build Tools e Qt 6 no Windows; Rust e Qt 6 devel no Fedora)
-   e montar o esqueleto: workspace Cargo com crate `protocol` (porte do `v9pro2/protocol.py`
-   + testes com bytes reais) e app CXX-Qt/QML só de leitura, com i18n en/pt-BR.
-4. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
+1. **Ganhos do EQ (cmd 18)** — ligar o editor de EQ ao headset. Antes: validar com
+   `--set` num perfil, guardando os ganhos originais para restaurar (lidos por `GET_EQ_STATE`).
+   Depois: nome do perfil (24) e restaurar EQ padrão (25), também com confirmação.
+2. Testar as escritas no Fedora (app e `python3 -m v9pro2 --set`).
+3. **Volume no PipeWire saturando em 15–20 %** (relato do usuário no Fedora 44). Hipótese
+   **[inf]**: faixa de dB do controle USB mal informada → testar no WirePlumber
+   `api.alsa.ignore-dB = true` ou `api.alsa.soft-mixer = true` numa regra para o card do
+   MCHOSE. Precisa da saída de `cat /proc/asound/cards`, `amixer -c <card> contents` e
+   `wpctl status` com o fone conectado. Depois: ligar os sliders Volume/Microfone ao mixer.
+4. Bandeja (`ksni`) e serviço em segundo plano.
+5. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
+
+Ambiente pronto no Windows: Rust 1.99.1, VS Build Tools 2022, Qt 6.10.3 em `C:\Qt`. O
+`hidapi` do Python não fica instalado: criar um venv no scratchpad
+(`pip install hidapi==0.14.0.post4`).
 
 ## Decisões
 

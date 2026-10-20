@@ -1,11 +1,15 @@
-//! Read-only access to the headset over HID. Only GET requests are sent.
+//! Access to the headset over HID: GET requests, the version query and the `Write` Sets.
 
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use hidapi::{HidApi, HidDevice};
-use v9pro2_protocol::{self as p, BatterySleep, CmdType, EqState};
+use v9pro2_protocol::{self as p, BatterySleep, CmdType, EqState, Write};
 
 const TIMEOUT: Duration = Duration::from_secs(3);
+
+/// One exchange with the headset at a time (refresh and writes run on worker threads).
+static LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Default, Clone)]
 pub struct Snapshot {
@@ -53,7 +57,8 @@ fn open() -> Result<(HidDevice, String, bool), Error> {
     Err(Error::NotFound)
 }
 
-/// Sends one read request and collects matching response payloads until `complete`.
+/// Sends one packet and collects matching response payloads until `complete`.
+/// A Set is answered by a Notify with the same `cmd`.
 fn transact(
     dev: &HidDevice,
     cmd_type: CmdType,
@@ -62,9 +67,12 @@ fn transact(
     matches: impl Fn(&[u8]) -> bool,
     complete: impl Fn(&[Vec<u8>]) -> bool,
 ) -> Result<Vec<Vec<u8>>, Error> {
-    // Read-only guard: never send Set / OTA commands other than the version query.
-    let allowed = cmd_type == p::REQUEST || (cmd_type == p::OTA_REQUEST && payload == [p::OTA_QUERY]);
-    assert!(allowed, "command not allowed: this build is read-only");
+    // Guard: only reads, the version query and the Sets built by `Write` (never reset / OTA).
+    let allowed = cmd_type == p::REQUEST
+        || (cmd_type == p::OTA_REQUEST && payload == [p::OTA_QUERY])
+        || (cmd_type == p::SET && [p::SET_EQ_MODE, p::SET_PROMPT_VOLUME, p::SET_AUTO_SHUTDOWN].contains(&cmd));
+    assert!(allowed, "command not allowed");
+    let reply_type = if cmd_type == p::SET { p::NOTIFY } else { cmd_type };
 
     let mut buf = [0u8; 64];
     while dev.read_timeout(&mut buf, 0)? > 0 {} // drop late responses
@@ -83,7 +91,7 @@ fn transact(
         }
         let data = if buf[0] == p::REPORT_ID { &buf[1..n] } else { &buf[..n] };
         if let Some(pkt) = p::parse(data) {
-            if pkt.cmd_type == cmd_type && pkt.cmd == cmd && matches(&pkt.payload) {
+            if pkt.cmd_type == reply_type && pkt.cmd == cmd && matches(&pkt.payload) {
                 packets.push(pkt.payload);
                 if complete(&packets) {
                     break;
@@ -101,6 +109,7 @@ fn read_one(dev: &HidDevice, cmd_type: CmdType, cmd: u8, payload: &[u8]) -> Resu
 }
 
 pub fn read_snapshot() -> Result<Snapshot, Error> {
+    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (dev, product, wired) = open()?;
     let get = |cmd| read_one(&dev, p::REQUEST, cmd, &[]);
     let mut s = Snapshot {
@@ -133,4 +142,12 @@ pub fn read_snapshot() -> Result<Snapshot, Error> {
     s.firmware_dongle = version(p::OTA_DONGLE)?;
     s.firmware_headset = version(p::OTA_HEADSET)?;
     Ok(s)
+}
+
+/// Sends one Set and returns the ack payload (`None` if the headset did not answer).
+pub fn write(w: Write) -> Result<Option<Vec<u8>>, Error> {
+    let (cmd, payload) = w.command().ok_or_else(|| Error::Hid(format!("value out of range: {w:?}")))?;
+    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (dev, ..) = open()?;
+    Ok(transact(&dev, p::SET, cmd, &payload, |_| true, |ps| !ps.is_empty())?.pop())
 }

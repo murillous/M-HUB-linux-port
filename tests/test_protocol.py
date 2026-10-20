@@ -63,3 +63,20 @@ class Decode(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Encode(unittest.TestCase):
+    def test_set_prompt_volume(self):
+        self.assertEqual(P.build(P.SET, P.SET_PROMPT_VOLUME, P.encode_set_prompt_volume(8))[:9],
+                         h("aa 01 00 02 00 02 21 08 00"))
+        for bad in (0, 17):
+            self.assertRaises(ValueError, P.encode_set_prompt_volume, bad)
+
+    def test_set_eq_mode(self):
+        self.assertEqual(P.encode_set_eq_mode(2), [2])
+        self.assertRaises(ValueError, P.encode_set_eq_mode, 3)
+
+    def test_set_auto_shutdown(self):
+        self.assertEqual(P.encode_set_auto_shutdown(30), [0x00, 0x1E])
+        self.assertEqual(P.encode_set_auto_shutdown(0), [0, 0])
+        self.assertRaises(ValueError, P.encode_set_auto_shutdown, 20)

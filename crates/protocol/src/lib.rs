@@ -24,6 +24,10 @@ pub const GET_CURRENT_EQ_MODE: u8 = 12;
 pub const GET_PROMPT_VOLUME: u8 = 13;
 pub const GET_AUTO_SHUTDOWN: u8 = 14;
 
+pub const SET_EQ_MODE: u8 = 1;
+pub const SET_AUTO_SHUTDOWN: u8 = 26;
+pub const SET_PROMPT_VOLUME: u8 = 33;
+
 pub const OTA_QUERY: u8 = 0x80;
 pub const OTA_HEADSET: u8 = 0;
 pub const OTA_DONGLE: u8 = 1;
@@ -31,6 +35,8 @@ pub const OTA_DONGLE: u8 = 1;
 pub const EQ_ALL_POINTS: u8 = 255;
 pub const EQ_MODE_COUNT: u8 = 3;
 pub const PROMPT_VOLUME_MAX: u8 = 16;
+/// Minutes offered by the vendor UI; 0 = never.
+pub const AUTO_SHUTDOWN_CHOICES: [u16; 4] = [15, 30, 45, 0];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Packet {
@@ -102,6 +108,30 @@ pub fn has_output_report(descriptor: &[u8], report_id: u8) -> bool {
         i += 1 + size;
     }
     false
+}
+
+/// The only Set commands this crate builds (validated on hardware, all reversible).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Write {
+    EqMode(u8),
+    PromptVolume(u8),
+    AutoShutdown(u16),
+}
+
+impl Write {
+    /// `(cmd, payload)` for a Set packet, or `None` if the value is out of range.
+    pub fn command(self) -> Option<(u8, Vec<u8>)> {
+        match self {
+            Write::EqMode(m) if m < EQ_MODE_COUNT => Some((SET_EQ_MODE, vec![m])),
+            Write::PromptVolume(v) if (1..=PROMPT_VOLUME_MAX).contains(&v) => {
+                Some((SET_PROMPT_VOLUME, vec![v]))
+            }
+            Write::AutoShutdown(m) if AUTO_SHUTDOWN_CHOICES.contains(&m) => {
+                Some((SET_AUTO_SHUTDOWN, m.to_be_bytes().to_vec()))
+            }
+            _ => None,
+        }
+    }
 }
 
 fn i16_be(hi: u8, lo: u8) -> i16 {
@@ -289,6 +319,18 @@ mod tests {
             eq.points[9],
             EqPoint { fc: 12000, gain_db: -1.0, q: 0.9, filter_type: 0, enable: true }
         );
+    }
+
+    #[test]
+    fn writes() {
+        let (cmd, payload) = Write::PromptVolume(11).command().unwrap();
+        assert_eq!(build(SET, cmd, &payload, false)[..9], h("aa 01 00 02 00 02 21 0b 00")[..]);
+        let (cmd, payload) = Write::AutoShutdown(45).command().unwrap();
+        assert_eq!(build(SET, cmd, &payload, false)[..9], h("aa 01 00 03 00 02 1a 00 2d")[..]);
+        assert_eq!(Write::EqMode(0).command(), Some((SET_EQ_MODE, vec![0])));
+        for bad in [Write::EqMode(3), Write::PromptVolume(0), Write::PromptVolume(17), Write::AutoShutdown(20)] {
+            assert_eq!(bad.command(), None);
+        }
     }
 
     #[test]

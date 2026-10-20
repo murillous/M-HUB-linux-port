@@ -1,8 +1,10 @@
-"""Read-only dump of MCHOSE V9 Pro 2 settings.
+"""Dump of MCHOSE V9 Pro 2 settings, with a few reversible writes.
 
 Uso: python -m v9pro2 [--raw]
+     python -m v9pro2 --set prompt-volume|eq-mode|auto-shutdown VALOR [--raw]
 
-Não envia nenhum comando de escrita: só os pacotes listados em READS.
+Sem --set só envia as leituras de READS. Com --set envia um único comando da lista WRITES
+e relê o valor; nunca FACTORY_RESET nem OTA.
 """
 
 import argparse
@@ -44,6 +46,13 @@ READS = [
 ]
 ALLOWED_CMD_TYPES = {P.REQUEST, P.OTA_REQUEST}
 
+# nome -> (cmd Set, encoder, leitura correspondente em READS). Lista fechada de escritas.
+WRITES = {
+    "prompt-volume": (P.SET_PROMPT_VOLUME, P.encode_set_prompt_volume, "prompt_volume"),
+    "eq-mode": (P.SET_EQ_MODE, P.encode_set_eq_mode, "current_eq_mode"),
+    "auto-shutdown": (P.SET_AUTO_SHUTDOWN, P.encode_set_auto_shutdown, "auto_shutdown"),
+}
+
 
 def find_device():
     for info in hid.enumerate(P.VID, 0):
@@ -65,10 +74,15 @@ def _drain(dev):
         pass
 
 
-def transact(dev, cmd_type, cmd, payload, match=None, complete=None, raw=False):
-    """Envia uma leitura e devolve a lista de payloads de resposta (vazia se timeout)."""
-    if cmd_type not in ALLOWED_CMD_TYPES or (cmd_type == P.OTA_REQUEST and payload != [P.OTA_QUERY]):
-        raise RuntimeError("command not allowed: this tool is read-only")
+def transact(dev, cmd_type, cmd, payload, match=None, complete=None, raw=False, ack=False):
+    """Envia um pacote e devolve a lista de payloads de resposta (vazia se timeout).
+
+    Com `ack`, a resposta esperada é um Notify com o mesmo cmd (ack de um Set).
+    """
+    is_write = cmd_type == P.SET and cmd in {w[0] for w in WRITES.values()}
+    if not is_write and (cmd_type not in ALLOWED_CMD_TYPES
+                         or (cmd_type == P.OTA_REQUEST and payload != [P.OTA_QUERY])):
+        raise RuntimeError("command not allowed")
     complete = complete or bool
     out = P.build(cmd_type, cmd, payload)
     _drain(dev)
@@ -87,17 +101,37 @@ def transact(dev, cmd_type, cmd, payload, match=None, complete=None, raw=False):
         pkt = P.parse(data)
         if raw:
             print("  <<", data[:24].hex(" "), "" if pkt else "(invalid)")
-        if pkt and pkt[0] == cmd_type and pkt[1] == cmd and (match is None or match(pkt[2])):
+        if pkt and pkt[0] == (P.NOTIFY if ack else cmd_type) and pkt[1] == cmd and (match is None or match(pkt[2])):
             packets.append(pkt[2])
             if complete(packets):
                 break
     return packets
 
 
+def read(dev, label, raw):
+    _, cmd_type, cmd, payload, decode, match, complete = next(r for r in READS if r[0] == label)
+    packets = transact(dev, cmd_type, cmd, payload, match, complete, raw)
+    return decode(packets) if packets else None
+
+
+def write(dev, name, value, raw):
+    """Envia um Set de WRITES; espera o ack Notify (se vier) e relê o valor."""
+    cmd, encode, label = WRITES[name]
+    payload = encode(value)
+    print(f"{label} before: {read(dev, label, raw)}")
+    ack = transact(dev, P.SET, cmd, payload, raw=raw, ack=True)
+    print("ack:", ack[0].hex(" ") if ack else "none")
+    print(f"{label} after: {read(dev, label, raw)}")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="v9pro2", description=__doc__.splitlines()[0])
     ap.add_argument("--raw", action="store_true", help="show raw sent/received bytes")
+    ap.add_argument("--set", nargs=2, metavar=("SETTING", "VALUE"),
+                    help="write one setting: " + ", ".join(WRITES))
     args = ap.parse_args()
+    if args.set and args.set[0] not in WRITES:
+        ap.error(f"unknown setting {args.set[0]!r}; choose from {', '.join(WRITES)}")
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     dev, info = find_device()
@@ -105,6 +139,9 @@ def main():
         sys.exit("V9 Pro 2 not found (or no hidraw permission; see linux/README.md)")
     print(f"{info['product_string']}  {P.VID:04x}:{info['product_id']:04x}")
     try:
+        if args.set:
+            write(dev, args.set[0], int(args.set[1]), args.raw)
+            return
         for label, cmd_type, cmd, payload, decode, match, complete in READS:
             if args.raw:
                 print(f"[{label}]")

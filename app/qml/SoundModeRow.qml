@@ -9,6 +9,8 @@ Rectangle {
     property string tag
     property string name
     property bool active: false
+    property bool selectable: false
+    signal select()
     signal edit()
 
     implicitHeight: 91
@@ -17,6 +19,14 @@ Rectangle {
     border.width: 1
     border.color: active ? Theme.activeRowBorder : "transparent"
     Behavior on color { ColorAnimation { duration: 200 } }
+
+    // whole row activates the mode; declared first so the Edit button stays on top
+    MouseArea {
+        anchors.fill: parent
+        enabled: row.selectable && !row.active
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: row.select()
+    }
 
     ColumnLayout {
         anchors.left: parent.left

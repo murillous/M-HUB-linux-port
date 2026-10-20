@@ -1,4 +1,4 @@
-//! `Headset` QML object: exposes the headset state read over HID.
+//! `Headset` QML object: exposes the headset state read over HID and writes the onboard settings.
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -38,6 +38,16 @@ pub mod qobject {
         /// Reads everything from the headset on a background thread.
         #[qinvokable]
         fn refresh(self: Pin<&mut Headset>);
+
+        /// 1..=16.
+        #[qinvokable]
+        fn set_prompt_volume_on_device(self: Pin<&mut Headset>, volume: i32);
+        /// 0..=2.
+        #[qinvokable]
+        fn set_eq_mode_on_device(self: Pin<&mut Headset>, mode: i32);
+        /// 15, 30, 45 or 0 (never).
+        #[qinvokable]
+        fn set_auto_shutdown_on_device(self: Pin<&mut Headset>, minutes: i32);
     }
 
     impl cxx_qt::Threading for Headset {}
@@ -47,6 +57,8 @@ use core::pin::Pin;
 
 use cxx_qt::Threading;
 use cxx_qt_lib::QString;
+
+use v9pro2_protocol::{self as protocol, Write};
 
 use crate::device::{self, Snapshot};
 
@@ -106,6 +118,56 @@ impl qobject::Headset {
                 obj.as_mut().set_busy(false);
             });
         });
+    }
+
+    pub fn set_prompt_volume_on_device(mut self: Pin<&mut Self>, volume: i32) {
+        let Ok(v) = u8::try_from(volume) else { return };
+        self.as_mut().set_prompt_volume(volume);
+        self.write(Write::PromptVolume(v));
+    }
+
+    pub fn set_eq_mode_on_device(mut self: Pin<&mut Self>, mode: i32) {
+        let Ok(m) = u8::try_from(mode) else { return };
+        self.as_mut().set_eq_mode(mode);
+        self.write(Write::EqMode(m));
+    }
+
+    pub fn set_auto_shutdown_on_device(mut self: Pin<&mut Self>, minutes: i32) {
+        let Ok(m) = u16::try_from(minutes) else { return };
+        self.as_mut().set_auto_shutdown_min(minutes);
+        self.write(Write::AutoShutdown(m));
+    }
+
+    /// Sends `w` on a worker thread; the ack sets the property, a failure re-reads everything.
+    fn write(self: Pin<&mut Self>, w: Write) {
+        let qt_thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let result = device::write(w);
+            let _ = qt_thread.queue(move |mut obj| match result {
+                Ok(Some(ack)) => obj.as_mut().apply_ack(w, &ack),
+                _ => obj.as_mut().refresh(),
+            });
+        });
+    }
+
+    fn apply_ack(mut self: Pin<&mut Self>, w: Write, ack: &[u8]) {
+        match w {
+            Write::PromptVolume(_) => {
+                if let Some(v) = protocol::decode_prompt_volume(ack) {
+                    self.as_mut().set_prompt_volume(v.into());
+                }
+            }
+            Write::EqMode(_) => {
+                if let Some(m) = protocol::decode_current_eq_mode(ack) {
+                    self.as_mut().set_eq_mode(m.into());
+                }
+            }
+            Write::AutoShutdown(_) => {
+                if let Some(m) = protocol::decode_auto_shutdown(ack) {
+                    self.as_mut().set_auto_shutdown_min(m.into());
+                }
+            }
+        }
     }
 
     fn apply(mut self: Pin<&mut Self>, result: Result<Snapshot, device::Error>) {

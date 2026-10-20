@@ -12,13 +12,15 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 5. Ao final da sessão: atualizar `docs/PROGRESSO.md` (status/pendências) e, se mudar o fluxo,
    este arquivo. Commitar com mensagem em português, sem linha de coautoria.
 
-## Onde paramos (2026-10-16, sessão 3)
+## Onde paramos (2026-10-19, sessão 4)
 
-- UI do app refeita para ficar igual ao MCHOSE HUB, com foco no editor de EQ
-  ([04](docs/04-referencia-visual.md)). Edição ainda só local; leituras HID validadas no Windows.
-- **Próximo passo:** rodar no Fedora 43 (`linux/README.md`), depois os primeiros Set (começar
-  pelo EQ, que já tem editor). Ver `docs/PROGRESSO.md`.
+- UI rodou no Fedora 44 (relato do usuário). Primeiras escritas validadas no hardware e ligadas
+  no app: notificação sonora (33), perfil de EQ (1), auto-desligamento (26).
+- **Próximo passo:** ganhos do EQ (cmd 18) com confirmação do usuário; e investigar o volume do
+  PipeWire saturando em 15–20 % no Fedora. Ver `docs/PROGRESSO.md`.
 - Testes: `cargo test --workspace` (e `python -m unittest discover -s tests -t .`).
+- CLI no hardware: `python -m v9pro2 [--set prompt-volume|eq-mode|auto-shutdown N]` (precisa de
+  `hidapi` num venv do scratchpad).
 - App: `cargo run -p mchose-v9` (Windows precisa de `C:\Qt\6.10.3\msvc2022_64\bin` no PATH;
   `QT_FORCE_STDERR_LOGGING=1` para ver os logs do QML). `-- --shot <pasta>` salva prints de
   todas as telas.

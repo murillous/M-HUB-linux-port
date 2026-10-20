@@ -60,6 +60,8 @@ Item {
                     help: Lang.tr("prompt.desc")
                     from: 1; to: page.headset.promptVolumeMax
                     value: page.headset.promptVolume
+                    editable: page.headset.connected && value >= 0
+                    onEdited: v => page.headset.setPromptVolumeOnDevice(v)
                 }
                 LevelRow {
                     Layout.topMargin: 38
@@ -109,6 +111,8 @@ Item {
                         tag: Lang.tr("mode.tag").arg(index + 1)
                         name: page.modeName(index)
                         active: page.headset.eqMode === index
+                        selectable: page.headset.connected
+                        onSelect: page.headset.setEqModeOnDevice(index)
                         onEdit: page.editEq(index)
                     }
                 }
@@ -127,6 +131,9 @@ Item {
         property real from
         property real to
         property real value: -1
+        property bool editable: false
+        /// Sent once the slider rests (debounced), so dragging doesn't flood the headset.
+        signal edited(int value)
 
         Layout.fillWidth: true
         spacing: 18
@@ -162,9 +169,13 @@ Item {
             Layout.fillWidth: true
             spacing: 24
             McSlider {
+                id: slider
                 Layout.fillWidth: true
-                enabled: false
+                enabled: row.editable
                 opacity: 1
+                stepSize: 1
+                snapMode: Slider.SnapAlways
+                onMoved: settle.restart()
                 dim: row.value < 0
                 from: row.from
                 to: row.to
@@ -176,11 +187,16 @@ Item {
             Text {
                 Layout.preferredWidth: 28
                 horizontalAlignment: Text.AlignRight
-                text: row.value < 0 ? Theme.dash : row.value
+                text: row.value < 0 ? Theme.dash : Math.round(slider.value)
                 font.family: Theme.font
                 font.pixelSize: 14
                 color: Theme.text
             }
+        }
+        Timer {
+            id: settle
+            interval: 250
+            onTriggered: if (Math.round(slider.value) !== row.value) row.edited(Math.round(slider.value))
         }
     }
 }
