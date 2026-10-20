@@ -1,6 +1,6 @@
 # Progresso do port
 
-Última atualização: 2026-10-20 (sessão 5)
+Última atualização: 2026-10-20 (sessão 6)
 
 Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI em inglês com opção de português (ver `CLAUDE.md`).
 
@@ -10,9 +10,9 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 |---|---|---|---|
 | **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1), ganhos (18) e nome (24) validados e no app** (testados pelo usuário); restaurar (25) pendente | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
-| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]**. **Sliders e mudo ligados no app** (`pw-dump` + `wpctl`); falta testar no Fedora | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
+| **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]**. **Sliders e mudo no app, confirmados pelo usuário no Fedora** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
 | **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
-| **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. Linux: PipeWire filter-chain/EasyEffects + `pw-loopback` | [03 §3](03-mapa-de-settings.md#mic-settings) |
+| **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. **AI NR = DeepFilterNet3** (descoberto no APO); parâmetros de todos os efeitos extraídos. **NR e retorno do mic no app** (`micfx.rs`), falta testar no Fedora; nivelamento e clareza pendentes | [03 §3](03-mapa-de-settings.md#como-o-thx-implementa-os-efeitos-de-microfone-sessão-6-obs) |
 | **Playback settings** (brilho, virtual bass, volume inteligente, clareza de voz) | DSP do runtime THX no Windows | Nada em HID. Linux: PipeWire filter-chain/EasyEffects | [03 §3](03-mapa-de-settings.md#speaker-settings-playback) |
 | **Other settings**: auto-desligamento | HID `GET/SET_AUTO_SHUTDOWN` (14/26), u16 minutos | **Leitura e escrita validadas**; no app (menu 15/30/45/nunca) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Other settings**: bateria / dormindo | HID `GET_BATTERY_SLEEP` (11) + notify 34 | **Leitura validada** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
@@ -56,19 +56,31 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    clique no ícone alterna o mudo. Relê a cada 1,5 s com a janela ativa para acompanhar
    mudanças feitas fora do app. A saturação em 15–20 % foi resolvida antes com
    `linux/51-mchose-v9pro2.conf` + `PCM` em 100 % **[obs]**.
+10. **Microfone: redução de ruído e retorno** (sessão 6): o usuário confirmou os sliders
+   Volume/Microfone no Fedora. Investigado o AI NR do THX: é o **DeepFilterNet3** open source
+   (`libDF` + modelo ONNX oficial), com atenuação limitada a 39 dB e post-filter 0,04; também
+   saíram do `props.dat` os parâmetros do nivelamento (compressor por nível), da clareza (EQ de
+   10 bandas) e do limitador. No app (`app/src/micfx.rs`): NR com o plugin LADSPA oficial
+   do DeepFilterNet (`tools/install-deepfilter.py`) num filter-chain que vira a fonte padrão;
+   retorno do mic com `module-loopback` pedindo quantum de 64 (1,3 ms) e
+   `linux/52-mchose-v9pro2-lowlatency.conf` opcional (sem modo batch, período de 64). Cada
+   efeito é um `pipewire -c` destacado, com pid/log em `$XDG_RUNTIME_DIR/mchose-v9/`.
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
 ## Pendências (em ordem)
 
-1. Testar no Fedora os sliders Volume/Microfone e o mudo (clique no ícone), inclusive se
-   acompanham o volume mudado pelo applet do KDE. Renomear perfil, editor de EQ e "Restaurar
-   padrão" já confirmados pelo usuário; falta confirmar slider da notificação, troca de modo e
-   menu do desligamento.
-2. Restaurar EQ de fábrica (25), com confirmação. Hoje "Restaurar padrão" no editor grava tudo
+1. Testar no Fedora a redução de ruído (instalar o plugin, ligar, gravar com e sem) e o
+   retorno do mic (latência percebida, estalos; `pw-top` com e sem o `52-…-lowlatency.conf`).
+   Se der erro, a nota no card mostra o fim do log (`$XDG_RUNTIME_DIR/mchose-v9/*.log`).
+   Falta confirmar também slider da notificação, troca de modo e menu do desligamento.
+2. Nivelamento e clareza do mic: clareza com biquads do filter-chain (EQ de 10 bandas com os
+   máximos do THX × nível); nivelamento precisa de compressor (LADSPA/LV2, ex. `lsp-plugins`
+   ou `swh-plugins` no Fedora). Encadear com o NR numa só fonte virtual.
+3. Restaurar EQ de fábrica (25), com confirmação. Hoje "Restaurar padrão" no editor grava tudo
    em 0 dB (plano), não o EQ de fábrica do perfil.
-3. Bandeja (`ksni`) e serviço em segundo plano.
-4. Presets PipeWire para os efeitos THX (playback e mic) e loopback para Mic Listen.
+4. Bandeja (`ksni`) e serviço em segundo plano (religar os efeitos do mic no login).
+5. Presets PipeWire para os efeitos de playback.
 
 Ambiente pronto no Windows: Rust 1.99.1, VS Build Tools 2022, Qt 6.10.3 em `C:\Qt`. O
 `hidapi` do Python não fica instalado: criar um venv no scratchpad

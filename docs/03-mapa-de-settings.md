@@ -70,6 +70,39 @@ Mecanismos:
 | Redução de ruído (AI NR) | `setAINREnable` | THX-DSP **[obs]** |
 | Ouvir o microfone (sidetone por software) | `electronAPI.setMicListenStatus` | Win-listen **[obs]** |
 
+#### Como o THX implementa os efeitos de microfone (sessão 6) **[obs]**
+
+Arquivos do driver THX no DriverStore (`thx_mchose_v9pro2_apo4.inf_*` e `thx_mchose_v9pro2_svc.inf_*`):
+`thx_mchose_v9pro2_apo4.dll` (APO), `…_apo4_rs.dll` (Rust), `…_apo4_nr_model.dat`,
+`…_props.dat` (zip com as definições dos efeitos). Nada disso vai para o repositório.
+
+- **AI NR = DeepFilterNet3**, projeto open source (MIT/Apache-2.0, Rikorose/DeepFilterNet).
+  O `nr_model.dat` é o `DeepFilterNet3_onnx.tar.gz` oficial (gzip de `enc.onnx`,
+  `erb_dec.onnx`, `df_dec.onnx` + `config.ini`: 48 kHz, FFT 960, hop 480 = 10 ms,
+  `df_lookahead = 2`). O `_rs.dll` é a `libDF` (C API `df_create`, `df_process_frame`,
+  `df_set_atten_lim`, `df_set_post_filter_beta`) com `tract-onnx 0.21.4`.
+- Parâmetros (disassembly do APO, `capstone`; o REA não tinha backend de disassembly
+  disponível no Windows): `df_create(modelo, atten_lim 0, NULL)`, depois
+  `df_set_post_filter_beta(0,04)` e `df_set_atten_lim(nível × atenuação máxima)`. O preset
+  `mic_presets/default` usa nível 0,65 e atenuação máxima 60 dB → **39 dB**. A UI só liga ou
+  desliga (`setAINREnable`); o liga/desliga vira um ganho de mistura 0/1 no APO.
+- `props.dat` → `thx_property_definitions.mic*.json` (valores usados no port):
+  - Nivelamento (`mic_volume_leveling_*`): compressor ssDRC com tabela por nível 0–100:
+    nível 0 → ratio 2, threshold −6 dB, knee 4, ganho +3 dB, ataque 5 ms, release 250 ms;
+    20 → 2,2/−11/5/+6/5/300; 40 → 2,4/−15,5/6/+9/6/350; 60 → 2,6/−19,5/7/+12/8/450;
+    80 → 2,8/−23,5/8/+15/10/550; 100 → 3/−27/9/+18/10/700.
+  - Clareza vocal (`mic_voice_clarity_*`): EQ de 10 bandas (31 Hz…16 kHz) com ganho
+    `nível × máximo`; máximos −12, −12, −11, 0, +7, +8, +8, 0, +3, +6 dB.
+  - Limitador final do mic (sempre ligado): ratio 7, threshold −1 dB, ataque 0,1 ms,
+    release 100 ms.
+  - Existe `mic_sidetone_enabled/level` no runtime, mas a UI do V9 Pro 2 não usa; o "Mic
+    Listen" é `MicListen.dll` ("Ouvir este dispositivo").
+
+Port no Linux (`app/src/micfx.rs`): NR = plugin LADSPA oficial do DeepFilterNet (v0.5.6, modelo
+de baixa latência do mesmo projeto, ~20 ms) num `filter-chain` com fonte virtual
+`mchose_v9_mic_nr` que vira a fonte padrão; monitoramento = `module-loopback` do mic cru para o
+fone com `node.latency = 64/48000`. Cada um roda como `pipewire -c` destacado.
+
 ### Other Settings
 
 | Setting | Comando | Mecanismo |

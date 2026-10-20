@@ -5,6 +5,8 @@ Rectangle {
     id: sw
 
     property bool checked: false
+    /// Only reports clicks; `checked` follows its binding (state owned elsewhere).
+    property bool controlled: false
     signal toggled(bool checked)
 
     implicitWidth: 40
@@ -28,8 +30,9 @@ Rectangle {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: {
-            sw.checked = !sw.checked
-            sw.toggled(sw.checked)
+            const next = !sw.checked
+            if (!sw.controlled) sw.checked = next
+            sw.toggled(next)
         }
     }
 }

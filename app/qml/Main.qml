@@ -18,6 +18,7 @@ ApplicationWindow {
 
     Headset { id: headset }
     Mixer { id: mixer }
+    MicFx { id: micFx }
 
     Settings {
         id: uiSettings
@@ -28,15 +29,23 @@ ApplicationWindow {
         Lang.i18n.language = uiSettings.language
         headset.refresh()
         mixer.refresh()
+        micFx.refresh()
     }
 
     readonly property var eqModes: {
         try { return JSON.parse(headset.eqJson) } catch (e) { return [] }
     }
+    // Note under a PipeWire mic effect card: start error first, then `fallback`.
+    function micFxNote(fx, fallback) {
+        if (!micFx.available) return Lang.tr("micfx.unavailable")
+        if (micFx.error === fx) return Lang.tr("micfx.failed") + "
+" + micFx.errorDetail
+        return fallback
+    }
     property bool editorOpen: false
     property int editorMode: 0
 
-    Timer { interval: 60000; running: true; repeat: true; onTriggered: { headset.refresh(); mixer.refresh() } }
+    Timer { interval: 60000; running: true; repeat: true; onTriggered: { headset.refresh(); mixer.refresh(); micFx.refresh() } }
     // Follows volume changes made elsewhere (KDE applet, media keys) while the window is in use.
     Timer {
         interval: 1500
@@ -186,6 +195,22 @@ ApplicationWindow {
                         { key: "micNr", intensity: false },
                         { key: "micMonitor", intensity: false }
                     ]
+                    controlled: ({
+                        micNr: {
+                            on: micFx.noiseReduction,
+                            enabled: micFx.available && micFx.nrInstalled && !micFx.busy,
+                            note: window.micFxNote("nr", micFx.nrInstalled ? "" : Lang.tr("micNr.missing"))
+                        },
+                        micMonitor: {
+                            on: micFx.monitoring,
+                            enabled: micFx.available && !micFx.busy,
+                            note: window.micFxNote("monitor", "")
+                        }
+                    })
+                    onSwitched: (key, on) => {
+                        if (key === "micNr") micFx.enableNoiseReduction(on)
+                        else micFx.enableMonitoring(on)
+                    }
                 }
 
                 OtherPage { headset: headset }

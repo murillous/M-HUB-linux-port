@@ -1,6 +1,7 @@
 mod device;
 mod headset;
 mod i18n;
+mod micfx;
 mod mixer;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QString, QUrl};

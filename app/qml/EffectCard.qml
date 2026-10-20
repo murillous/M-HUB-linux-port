@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 
 // Playback / microphone effect: title + switch, description, optional intensity slider
-// with its two end labels and a reset button. State is local until the PipeWire side exists.
+// with its two end labels and a reset button. State is local unless `controlled` (then `on`
+// is bound from outside and a click only emits `switched`).
 Card {
     id: card
 
@@ -13,7 +14,13 @@ Card {
     property string highLabel
     property int defaultValue: 0
     property bool on: false
+    property bool controlled: false
+    property bool switchEnabled: true
+    /// Shown under the description, e.g. why the effect can't be turned on.
+    property string note
     property int value: defaultValue
+
+    signal switched(bool on)
 
     implicitHeight: 200
 
@@ -30,11 +37,17 @@ Card {
         }
         McSwitch {
             checked: card.on
-            onToggled: checked => card.on = checked
+            controlled: card.controlled
+            enabled: card.switchEnabled
+            onToggled: checked => {
+                if (!card.controlled) card.on = checked
+                card.switched(checked)
+            }
         }
     }
 
     Text {
+        id: desc
         anchors.top: head.bottom
         anchors.topMargin: 10
         width: parent.width
@@ -43,6 +56,20 @@ Card {
         font.family: Theme.font
         font.pixelSize: 13
         color: Theme.textDim
+    }
+
+    Text {
+        anchors.top: desc.bottom
+        anchors.topMargin: 12
+        width: parent.width
+        visible: card.note !== ""
+        wrapMode: Text.WordWrap
+        maximumLineCount: 4
+        elide: Text.ElideRight
+        text: card.note
+        font.family: Theme.font
+        font.pixelSize: 12
+        color: Theme.textFaint
     }
 
     Item {

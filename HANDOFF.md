@@ -12,13 +12,12 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 5. Ao final da sessão: atualizar `docs/PROGRESSO.md` (status/pendências) e, se mudar o fluxo,
    este arquivo. Commitar com mensagem em português, sem linha de coautoria.
 
-## Onde paramos (2026-10-19, sessão 4)
+## Onde paramos (2026-10-20, sessão 6)
 
-- UI rodou no Fedora 44 (relato do usuário). Primeiras escritas validadas no hardware e ligadas
-  no app: notificação sonora (33), perfil de EQ (1), auto-desligamento (26) e ganhos do EQ (18,
-  gravados pelo editor).
-- **Próximo passo:** usuário testar no Fedora os sliders Volume/Microfone e o mudo (ligados ao
-  PipeWire em `app/src/mixer.rs`); restaurar EQ de fábrica (25). Ver `docs/PROGRESSO.md`.
+- Volume/Microfone confirmados no Fedora. AI NR do THX identificado como DeepFilterNet3; NR e
+  retorno do mic ligados no app (`app/src/micfx.rs`, PipeWire).
+- **Próximo passo:** usuário testar no Fedora o NR (`python3 tools/install-deepfilter.py`) e
+  a latência do retorno; depois nivelamento e clareza do mic. Ver `docs/PROGRESSO.md`.
 - Testes: `cargo test --workspace` (e `python -m unittest discover -s tests -t .`).
 - CLI no hardware: `python -m v9pro2 [--set prompt-volume|eq-mode|auto-shutdown N | eq-gains M:G1,…,G10 | eq-name M:NOME]` (precisa de
   `hidapi` num venv do scratchpad).
@@ -65,6 +64,14 @@ Pontos de referência encontrados (nomes mudam a cada build da MCHOSE):
 - chunk `theme-*.js` (strings ofuscadas) → `buildReportData`, `CmdType`, consulta de versão
   (procure `OtaRequest`, `V9 Pro 2 ensureHidDeviceOpen`).
 - `node tools/re/extract-fns.js <bundle> <out.js> <nomes…>` extrai funções por nome.
+
+### Driver THX do V9 Pro 2 (efeitos de mic/playback)
+
+Fica em `C:\Windows\System32\DriverStore\FileRepository\thx_mchose_v9pro2_apo4.inf_*`
+(APO, `_rs.dll` = libDF, `_nr_model.dat` = tar.gz do DeepFilterNet3) e `thx_mchose_v9pro2_svc.inf_*`
+(`_props.dat` é um zip com as definições e presets). O REA não tem backend de disassembly neste
+Windows (Ghidra só como código em `C:\repos\ghidra-master`); use `pefile` + `capstone` num venv do
+scratchpad (`pip install pefile==2024.8.26 capstone==5.0.3`).
 
 ### Baixar o shell das telas do headset (customPage)
 

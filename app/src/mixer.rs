@@ -161,7 +161,12 @@ impl qobject::Mixer {
         std::thread::spawn(move || {
             let reading = {
                 let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-                let (sink, source) = if lookup { find_nodes() } else { known };
+                let (sink, source) = if lookup {
+                    let (sink, source) = find_nodes();
+                    (sink.map(|n| n.id), source.map(|n| n.id))
+                } else {
+                    known
+                };
                 Reading { sink, source, output: sink.and_then(get_volume), input: source.and_then(get_volume) }
             };
             let _ = qt_thread.queue(move |mut obj| {
@@ -199,7 +204,7 @@ impl qobject::Mixer {
     }
 }
 
-fn wpctl(args: &[&str]) -> Option<String> {
+pub(crate) fn wpctl(args: &[&str]) -> Option<String> {
     let out = Command::new("wpctl").args(args).output().ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
@@ -214,25 +219,47 @@ fn parse_volume(s: &str) -> Option<Level> {
     Some(Level { percent: (v * 100.0).round().clamp(0.0, 100.0) as i32, muted: s.contains("[MUTED]") })
 }
 
-/// `(sink, source)` node ids of the headset.
-fn find_nodes() -> (Option<u32>, Option<u32>) {
-    let Some(out) = Command::new("pw-dump").output().ok().filter(|o| o.status.success()) else {
-        return (None, None);
-    };
-    parse_nodes(&out.stdout)
+/// A PipeWire node: global id and `node.name`.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Node {
+    pub id: u32,
+    pub name: String,
 }
 
-fn parse_nodes(json: &[u8]) -> (Option<u32>, Option<u32>) {
-    let Ok(serde_json::Value::Array(objects)) = serde_json::from_slice(json) else { return (None, None) };
-    let find = |class: &str| {
-        objects.iter().find_map(|o| {
-            let props = o.pointer("/info/props")?;
-            let name = props.get("node.name")?.as_str()?;
-            (props.get("media.class")?.as_str()? == class && name.contains(NODE_NAME))
-                .then(|| o.get("id")?.as_u64()?.try_into().ok())?
-        })
+/// `(sink, source)` nodes of the headset.
+pub(crate) fn find_nodes() -> (Option<Node>, Option<Node>) {
+    let objects = pw_dump();
+    (find_node(&objects, |name, class| class == "Audio/Sink" && name.contains(NODE_NAME)),
+     find_node(&objects, |name, class| class == "Audio/Source" && name.contains(NODE_NAME)))
+}
+
+/// Id of the node called exactly `name`.
+pub(crate) fn find_node_id(name: &str) -> Option<u32> {
+    find_node(&pw_dump(), |n, _| n == name).map(|n| n.id)
+}
+
+fn pw_dump() -> Vec<serde_json::Value> {
+    let Some(out) = Command::new("pw-dump").output().ok().filter(|o| o.status.success()) else {
+        return Vec::new();
     };
-    (find("Audio/Sink"), find("Audio/Source"))
+    parse_dump(&out.stdout)
+}
+
+fn parse_dump(json: &[u8]) -> Vec<serde_json::Value> {
+    match serde_json::from_slice(json) {
+        Ok(serde_json::Value::Array(objects)) => objects,
+        _ => Vec::new(),
+    }
+}
+
+/// First node whose `(node.name, media.class)` matches.
+fn find_node(objects: &[serde_json::Value], matches: impl Fn(&str, &str) -> bool) -> Option<Node> {
+    objects.iter().find_map(|o| {
+        let props = o.pointer("/info/props")?;
+        let name = props.get("node.name")?.as_str()?;
+        let class = props.get("media.class").and_then(|c| c.as_str()).unwrap_or("");
+        matches(name, class).then(|| Some(Node { id: o.get("id")?.as_u64()?.try_into().ok()?, name: name.into() }))?
+    })
 }
 
 #[cfg(test)]
@@ -260,7 +287,12 @@ mod tests {
             {"id": 58, "type": "PipeWire:Interface:Node", "info": {"props": {
                 "node.name": "alsa_input.usb-bestechnic_MCHOSE_V9_Pro_2-00.mono-fallback", "media.class": "Audio/Source"}}}
         ]"#;
-        assert_eq!(parse_nodes(json), (Some(57), Some(58)));
-        assert_eq!(parse_nodes(b"[]"), (None, None));
+        let objects = parse_dump(json);
+        let source = |name: &str, class: &str| class == "Audio/Source" && name.contains(NODE_NAME);
+        let found = find_node(&objects, source).unwrap();
+        assert_eq!((found.id, found.name.as_str()), (58, "alsa_input.usb-bestechnic_MCHOSE_V9_Pro_2-00.mono-fallback"));
+        assert_eq!(find_node(&objects, |name, _| name.contains(NODE_NAME)).map(|n| n.id), Some(57));
+        assert!(find_node(&parse_dump(b"[]"), source).is_none());
+        assert!(parse_dump(b"oops").is_empty());
     }
 }

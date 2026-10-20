@@ -34,6 +34,33 @@ python3 -m v9pro2 --set eq-gains 2:2,3.5,-3.5,5.5,1.5,3,2,2.5,1,-1   # perfil:10
 
 `--set` envia um único comando de uma lista fechada e relê o valor; nunca reset nem OTA.
 
+## Efeitos do microfone
+
+- **Redução de ruído** usa o plugin LADSPA do DeepFilterNet (o mesmo projeto do AI NR do
+  MCHOSE HUB). Instale uma vez:
+
+  ```bash
+  python3 tools/install-deepfilter.py   # baixa ~50 MB do GitHub para ~/.local/lib/ladspa
+  ```
+
+  Ligado, o app cria a fonte "MCHOSE V9 Pro 2 Microphone (AI noise reduction)" e a deixa como
+  microfone padrão; desligado, volta para o microfone do headset. Apps com o microfone do
+  headset escolhido à mão (ex.: Discord) precisam ser trocados para a fonte nova.
+- **Retorno do microfone** liga um loopback do mic cru para o fone pedindo quantum de 64
+  amostras (1,3 ms). Para cortar também o buffer do ALSA (opcional):
+
+  ```bash
+  cp linux/52-mchose-v9pro2-lowlatency.conf ~/.config/wireplumber/wireplumber.conf.d/
+  systemctl --user restart wireplumber
+  ```
+
+  Se aparecerem estalos, aumente `api.alsa.period-size` (128/256) ou apague o arquivo.
+  `pw-top` mostra o quantum e os xruns (coluna ERR).
+
+Os dois rodam como processos `pipewire -c` separados e continuam depois que a janela fecha;
+arquivos e log em `$XDG_RUNTIME_DIR/mchose-v9/`. Depois de reiniciar o PC, ligue de novo pelo
+app (ainda não há serviço em segundo plano).
+
 ## Visual do app (opcional)
 
 - Fonte **MiSans** (gratuita, da Xiaomi): instale em `~/.local/share/fonts` para o visual ficar

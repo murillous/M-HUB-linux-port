@@ -86,6 +86,9 @@ micNr.title = Redução de ruído do microfone
 micNr.desc = Filtra o ruído ambiente preservando a voz
 micMonitor.title = Retorno do microfone
 micMonitor.desc = Ouça a própria voz em tempo real
+micNr.missing = Requer o plugin DeepFilterNet: rode python3 tools/install-deepfilter.py
+micfx.unavailable = Microfone do headset não encontrado no PipeWire (só no Linux).
+micfx.failed = Não foi possível iniciar:
 
 other.power = Gerenciamento de energia
 other.smartPowerOff = Desligamento automático:
