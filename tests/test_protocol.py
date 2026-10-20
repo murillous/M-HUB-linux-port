@@ -76,6 +76,15 @@ class Encode(unittest.TestCase):
         self.assertEqual(P.encode_set_eq_mode(2), [2])
         self.assertRaises(ValueError, P.encode_set_eq_mode, 3)
 
+    def test_set_eq_gains(self):
+        gains = [2, 3.5, -3.5, 5.5, 1.5, 3, 2, 2.5, 1, -1]
+        p = P.encode_set_eq_gains(2, gains)
+        self.assertEqual(p[:6], [2, 10, 0x00, 0x14, 0x00, 0x23])
+        self.assertEqual(p[6:8], [0xFF, 0xDD])  # -3.5 dB
+        self.assertEqual(len(P.build(P.SET, P.SET_EQ_GAINS, p)), 63)
+        self.assertRaises(ValueError, P.encode_set_eq_gains, 2, gains[:9])
+        self.assertRaises(ValueError, P.encode_set_eq_gains, 2, [12.5] + gains[1:])
+
     def test_set_auto_shutdown(self):
         self.assertEqual(P.encode_set_auto_shutdown(30), [0x00, 0x1E])
         self.assertEqual(P.encode_set_auto_shutdown(0), [0, 0])

@@ -9,7 +9,7 @@ status.hint = Plug in the dongle and turn the headset on. On Linux, install the 
 action.refresh = Refresh
 settings.language = Language
 battery.charging = Charging
-note.readonly = Preview: sound mode, notification volume and power off are saved to the headset; EQ edits are not sent yet.
+note.readonly = Preview: changes are saved to the headset; volume, microphone and the effects are not connected yet.
 
 nav.common = Common parameters
 nav.playback = Playback settings
@@ -43,7 +43,8 @@ eq.apply = Apply
 eq.delete = Delete
 eq.noPresets = No saved presets yet.
 eq.myPresetName = My preset %1
-eq.localOnly = These changes stay in this app: writing the EQ to the headset is not enabled yet.
+eq.localOnly = Headset not connected: these changes stay in this app.
+eq.saving = Saving to the headset…
 
 preset.flat = Flat
 preset.bass = Bass Boost

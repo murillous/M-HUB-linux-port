@@ -9,7 +9,7 @@ status.hint = Conecte o dongle e ligue o headset. No Linux, instale a regra udev
 action.refresh = Atualizar
 settings.language = Idioma
 battery.charging = Carregando
-note.readonly = Prévia: modo de som, notificação sonora e desligamento já são gravados no headset; a edição do EQ ainda não é enviada.
+note.readonly = Prévia: as mudanças já são gravadas no headset; volume, microfone e efeitos ainda não estão ligados.
 
 nav.common = Parâmetros gerais
 nav.playback = Reprodução
@@ -43,7 +43,8 @@ eq.apply = Aplicar
 eq.delete = Excluir
 eq.noPresets = Nenhum preset salvo ainda.
 eq.myPresetName = Meu preset %1
-eq.localOnly = Essas mudanças ficam só no app: gravar o EQ no headset ainda não está habilitado.
+eq.localOnly = Headset desconectado: essas mudanças ficam só no app.
+eq.saving = Gravando no headset…
 
 preset.flat = Plano
 preset.bass = Reforço de graves

@@ -8,7 +8,7 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 
 | Funcionalidade | Mecanismo no Windows | Status | Onde está documentado |
 |---|---|---|---|
-| **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (cmd 1) validada e no app**; ganhos (18) não testados | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1) e ganhos (18) validados e no app**; nome (24) e restaurar (25) pendentes | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
 | **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo **[inf]**. **Problema relatado no Fedora:** com 15–20 % o som já fica no máximo (ver pendência 3) | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
 | **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
@@ -41,15 +41,18 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    auto-desligamento (26), com ack Notify e releitura; valores restaurados. Ligados no app:
    slider da notificação (com debounce), clique na linha do modo de som, menu do desligamento.
    `python -m v9pro2 --set …` para testes pela linha de comando.
+   Ganhos do EQ (18) validados (sem ack; conferido relendo) e ligados ao editor: grava sozinho
+   400 ms depois que a curva para e ativa o perfil editado, como o app oficial. Os controles do
+   app não foram clicados nos testes (o caminho HID é o mesmo do CLI validado).
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
 ## Pendências (em ordem)
 
-1. **Ganhos do EQ (cmd 18)** — ligar o editor de EQ ao headset. Antes: validar com
-   `--set` num perfil, guardando os ganhos originais para restaurar (lidos por `GET_EQ_STATE`).
-   Depois: nome do perfil (24) e restaurar EQ padrão (25), também com confirmação.
-2. Testar as escritas no Fedora (app e `python3 -m v9pro2 --set`).
+1. Testar as escritas pelo app (Windows e Fedora): slider da notificação, troca de modo,
+   menu do desligamento e editor de EQ.
+2. Nome do perfil (24) e restaurar EQ padrão (25), com confirmação. Hoje "Restaurar padrão"
+   no editor grava tudo em 0 dB (plano), não o EQ de fábrica do perfil.
 3. **Volume no PipeWire saturando em 15–20 %** (relato do usuário no Fedora 44). Hipótese
    **[inf]**: faixa de dB do controle USB mal informada → testar no WirePlumber
    `api.alsa.ignore-dB = true` ou `api.alsa.soft-mixer = true` numa regra para o card do

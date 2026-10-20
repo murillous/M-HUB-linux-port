@@ -25,6 +25,7 @@ GET_AUTO_SHUTDOWN = 14
 SET_EQ_MODE = 1
 SET_AUTO_SHUTDOWN = 26
 SET_PROMPT_VOLUME = 33
+SET_EQ_GAINS = 18
 
 OTA_QUERY = 0x80
 OTA_HEADSET, OTA_DONGLE = 0, 1
@@ -32,6 +33,8 @@ OTA_HEADSET, OTA_DONGLE = 0, 1
 EQ_ALL_POINTS = 255
 EQ_MODE_NAMES = ("Game 1", "Game 2", "Game 3")
 PROMPT_VOLUME_MAX = 16
+EQ_GAIN_MIN_DB, EQ_GAIN_MAX_DB = -12, 12
+EQ_BANDS = 10
 AUTO_SHUTDOWN_CHOICES = (15, 30, 45, 0)  # minutos oferecidos pela UI; 0 = nunca
 
 
@@ -129,6 +132,19 @@ def encode_set_auto_shutdown(minutes):
     if minutes not in AUTO_SHUTDOWN_CHOICES:
         raise ValueError(f"minutos deve ser um de {AUTO_SHUTDOWN_CHOICES}")
     return [minutes >> 8, minutes & 0xFF]
+
+
+def encode_set_eq_gains(mode, gains_db):
+    """[mode, n, (g_hi, g_lo)×n], g = round(dB × 10) int16 big-endian."""
+    encode_set_eq_mode(mode)
+    if len(gains_db) != EQ_BANDS:
+        raise ValueError(f"esperados {EQ_BANDS} ganhos")
+    out = [mode, len(gains_db)]
+    for g in gains_db:
+        if not EQ_GAIN_MIN_DB <= g <= EQ_GAIN_MAX_DB:
+            raise ValueError(f"ganho fora de {EQ_GAIN_MIN_DB}..{EQ_GAIN_MAX_DB} dB")
+        out += list(round(g * 10).to_bytes(2, "big", signed=True))
+    return out
 
 
 def decode_current_eq_mode(p):

@@ -146,7 +146,13 @@ ApplicationWindow {
                             modes: window.eqModes
                             modeIndex: window.editorMode
                             activeMode: headset.eqMode
+                            canWrite: headset.connected
                             onCollapse: window.editorOpen = false
+                            // like the original app: writing a mode also makes it the active one
+                            onWriteGains: (mode, gains) => {
+                                headset.setEqGainsOnDevice(mode, gains.join(","))
+                                if (headset.eqMode !== mode) headset.setEqModeOnDevice(mode)
+                            }
                         }
                     }
                 }

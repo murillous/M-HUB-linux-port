@@ -48,6 +48,9 @@ pub mod qobject {
         /// 15, 30, 45 or 0 (never).
         #[qinvokable]
         fn set_auto_shutdown_on_device(self: Pin<&mut Headset>, minutes: i32);
+        /// `gains`: the 10 band gains in dB, comma separated (−12…+12, 0.1 steps).
+        #[qinvokable]
+        fn set_eq_gains_on_device(self: Pin<&mut Headset>, mode: i32, gains: &QString);
     }
 
     impl cxx_qt::Threading for Headset {}
@@ -55,12 +58,12 @@ pub mod qobject {
 
 use core::pin::Pin;
 
-use cxx_qt::Threading;
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 
-use v9pro2_protocol::{self as protocol, Write};
+use v9pro2_protocol::{self as protocol, EqState, Write};
 
-use crate::device::{self, Snapshot};
+use crate::device::{self, Snapshot, Written};
 
 pub struct HeadsetRust {
     busy: bool,
@@ -79,6 +82,11 @@ pub struct HeadsetRust {
     eq_json: QString,
     firmware_dongle: QString,
     firmware_headset: QString,
+    /// Source of `eq_json`, kept to patch one mode after an EQ write.
+    eq_names: Vec<String>,
+    eq_states: Vec<Option<EqState>>,
+    /// Bumped on every EQ write; only the newest read-back is applied.
+    eq_write_seq: u64,
 }
 
 impl Default for HeadsetRust {
@@ -100,6 +108,9 @@ impl Default for HeadsetRust {
             eq_json: QString::from("[]"),
             firmware_dongle: QString::default(),
             firmware_headset: QString::default(),
+            eq_names: Vec::new(),
+            eq_states: Vec::new(),
+            eq_write_seq: 0,
         }
     }
 }
@@ -138,16 +149,52 @@ impl qobject::Headset {
         self.write(Write::AutoShutdown(m));
     }
 
+    pub fn set_eq_gains_on_device(mut self: Pin<&mut Self>, mode: i32, gains: &QString) {
+        let tenths: Vec<i16> = String::from(gains)
+            .split(',')
+            .filter_map(|g| g.trim().parse::<f32>().ok())
+            .map(|db| (db.clamp(-12.0, 12.0) * 10.0).round() as i16)
+            .collect();
+        let (Ok(mode), Ok(tenths)) = (u8::try_from(mode), <[i16; protocol::EQ_BANDS]>::try_from(tenths)) else {
+            return;
+        };
+        let seq = self.rust().eq_write_seq + 1;
+        self.as_mut().rust_mut().eq_write_seq = seq;
+        let qt_thread = self.qt_thread();
+        std::thread::spawn(move || {
+            let result = device::write(Write::EqGains { mode, tenths });
+            let _ = qt_thread.queue(move |mut obj| {
+                if obj.rust().eq_write_seq != seq {
+                    return; // a newer write is on its way
+                }
+                match result {
+                    Ok(Written::Eq(Some(state))) => obj.as_mut().apply_eq_state(mode, state),
+                    _ => obj.as_mut().refresh(),
+                }
+            });
+        });
+    }
+
     /// Sends `w` on a worker thread; the ack sets the property, a failure re-reads everything.
     fn write(self: Pin<&mut Self>, w: Write) {
         let qt_thread = self.qt_thread();
         std::thread::spawn(move || {
             let result = device::write(w);
             let _ = qt_thread.queue(move |mut obj| match result {
-                Ok(Some(ack)) => obj.as_mut().apply_ack(w, &ack),
+                Ok(Written::Ack(Some(ack))) => obj.as_mut().apply_ack(w, &ack),
                 _ => obj.as_mut().refresh(),
             });
         });
+    }
+
+    fn apply_eq_state(mut self: Pin<&mut Self>, mode: u8, state: EqState) {
+        let json = {
+            let mut rust = self.as_mut().rust_mut();
+            let Some(slot) = rust.eq_states.get_mut(mode as usize) else { return };
+            *slot = Some(state);
+            eq_json(&rust.eq_names, &rust.eq_states)
+        };
+        self.as_mut().set_eq_json(QString::from(&json));
     }
 
     fn apply_ack(mut self: Pin<&mut Self>, w: Write, ack: &[u8]) {
@@ -167,6 +214,7 @@ impl qobject::Headset {
                     self.as_mut().set_auto_shutdown_min(m.into());
                 }
             }
+            Write::EqGains { .. } => {}
         }
     }
 
@@ -197,9 +245,12 @@ impl qobject::Headset {
         this.as_mut().set_prompt_volume(opt(s.prompt_volume.map(i32::from)));
         this.as_mut().set_auto_shutdown_min(opt(s.auto_shutdown_min.map(i32::from)));
         this.as_mut().set_eq_mode(opt(s.eq_mode.map(i32::from)));
-        this.as_mut().set_eq_json(QString::from(&eq_json(&s)));
+        this.as_mut().set_eq_json(QString::from(&eq_json(&s.eq_names, &s.eq_states)));
         this.as_mut().set_firmware_dongle(QString::from(s.firmware_dongle.as_deref().unwrap_or("")));
         this.as_mut().set_firmware_headset(QString::from(s.firmware_headset.as_deref().unwrap_or("")));
+        let mut rust = this.as_mut().rust_mut();
+        rust.eq_names = s.eq_names;
+        rust.eq_states = s.eq_states;
     }
 }
 
@@ -217,11 +268,10 @@ fn json_str(s: &str) -> String {
     out
 }
 
-fn eq_json(s: &Snapshot) -> String {
-    let modes: Vec<String> = s
-        .eq_names
+fn eq_json(names: &[String], states: &[Option<EqState>]) -> String {
+    let modes: Vec<String> = names
         .iter()
-        .zip(&s.eq_states)
+        .zip(states)
         .map(|(name, state)| {
             let points: Vec<String> = state
                 .iter()

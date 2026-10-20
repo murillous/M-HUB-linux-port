@@ -57,6 +57,25 @@ fn open() -> Result<(HidDevice, String, bool), Error> {
     Err(Error::NotFound)
 }
 
+/// Drops late responses and sends one packet.
+fn send(dev: &HidDevice, cmd_type: CmdType, cmd: u8, payload: &[u8]) -> Result<(), Error> {
+    // Guard: only reads, the version query and the Sets built by `Write` (never reset / OTA).
+    const SETS: [u8; 4] = [p::SET_EQ_MODE, p::SET_PROMPT_VOLUME, p::SET_AUTO_SHUTDOWN, p::SET_EQ_GAINS];
+    let allowed = cmd_type == p::REQUEST
+        || (cmd_type == p::OTA_REQUEST && payload == [p::OTA_QUERY])
+        || (cmd_type == p::SET && SETS.contains(&cmd));
+    assert!(allowed, "command not allowed");
+
+    let mut buf = [0u8; 64];
+    while dev.read_timeout(&mut buf, 0)? > 0 {} // drop late responses
+
+    let mut out = [0u8; p::REPORT_LEN + 1];
+    out[0] = p::REPORT_ID;
+    out[1..].copy_from_slice(&p::build(cmd_type, cmd, payload, false));
+    dev.write(&out)?;
+    Ok(())
+}
+
 /// Sends one packet and collects matching response payloads until `complete`.
 /// A Set is answered by a Notify with the same `cmd`.
 fn transact(
@@ -67,20 +86,9 @@ fn transact(
     matches: impl Fn(&[u8]) -> bool,
     complete: impl Fn(&[Vec<u8>]) -> bool,
 ) -> Result<Vec<Vec<u8>>, Error> {
-    // Guard: only reads, the version query and the Sets built by `Write` (never reset / OTA).
-    let allowed = cmd_type == p::REQUEST
-        || (cmd_type == p::OTA_REQUEST && payload == [p::OTA_QUERY])
-        || (cmd_type == p::SET && [p::SET_EQ_MODE, p::SET_PROMPT_VOLUME, p::SET_AUTO_SHUTDOWN].contains(&cmd));
-    assert!(allowed, "command not allowed");
+    send(dev, cmd_type, cmd, payload)?;
     let reply_type = if cmd_type == p::SET { p::NOTIFY } else { cmd_type };
-
     let mut buf = [0u8; 64];
-    while dev.read_timeout(&mut buf, 0)? > 0 {} // drop late responses
-
-    let mut out = [0u8; p::REPORT_LEN + 1];
-    out[0] = p::REPORT_ID;
-    out[1..].copy_from_slice(&p::build(cmd_type, cmd, payload, false));
-    dev.write(&out)?;
 
     let mut packets = Vec::new();
     let deadline = Instant::now() + TIMEOUT;
@@ -108,6 +116,18 @@ fn read_one(dev: &HidDevice, cmd_type: CmdType, cmd: u8, payload: &[u8]) -> Resu
     Ok(transact(dev, cmd_type, cmd, payload, matches, |ps| !ps.is_empty())?.pop())
 }
 
+fn read_eq_state(dev: &HidDevice, mode: u8) -> Result<Option<EqState>, Error> {
+    let packets = transact(
+        dev,
+        p::REQUEST,
+        p::GET_EQ_STATE,
+        &[mode, p::EQ_ALL_POINTS],
+        |r| r.len() >= 2 && r[0] == mode && r[1] == p::EQ_ALL_POINTS,
+        p::eq_points_complete,
+    )?;
+    Ok(p::decode_eq_all_points(&packets))
+}
+
 pub fn read_snapshot() -> Result<Snapshot, Error> {
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (dev, product, wired) = open()?;
@@ -126,15 +146,7 @@ pub fn read_snapshot() -> Result<Snapshot, Error> {
             .and_then(|r| p::decode_eq_mode_desc(&r));
         s.eq_names.push(desc.map(|d| d.name).unwrap_or_default());
 
-        let packets = transact(
-            &dev,
-            p::REQUEST,
-            p::GET_EQ_STATE,
-            &[mode, p::EQ_ALL_POINTS],
-            |r| r.len() >= 2 && r[0] == mode && r[1] == p::EQ_ALL_POINTS,
-            p::eq_points_complete,
-        )?;
-        s.eq_states.push(p::decode_eq_all_points(&packets));
+        s.eq_states.push(read_eq_state(&dev, mode)?);
     }
     let version = |target| -> Result<Option<String>, Error> {
         Ok(read_one(&dev, p::OTA_REQUEST, target, &[p::OTA_QUERY])?.and_then(|r| p::decode_version(&r)))
@@ -144,10 +156,21 @@ pub fn read_snapshot() -> Result<Snapshot, Error> {
     Ok(s)
 }
 
-/// Sends one Set and returns the ack payload (`None` if the headset did not answer).
-pub fn write(w: Write) -> Result<Option<Vec<u8>>, Error> {
+pub enum Written {
+    /// Payload of the Notify ack (`None` if the headset did not answer).
+    Ack(Option<Vec<u8>>),
+    /// EQ gains have no ack: the mode's state read back right after.
+    Eq(Option<EqState>),
+}
+
+/// Sends one Set.
+pub fn write(w: Write) -> Result<Written, Error> {
     let (cmd, payload) = w.command().ok_or_else(|| Error::Hid(format!("value out of range: {w:?}")))?;
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let (dev, ..) = open()?;
-    Ok(transact(&dev, p::SET, cmd, &payload, |_| true, |ps| !ps.is_empty())?.pop())
+    if let Write::EqGains { mode, .. } = w {
+        send(&dev, p::SET, cmd, &payload)?;
+        return Ok(Written::Eq(read_eq_state(&dev, mode)?));
+    }
+    Ok(Written::Ack(transact(&dev, p::SET, cmd, &payload, |_| true, |ps| !ps.is_empty())?.pop()))
 }

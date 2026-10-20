@@ -29,6 +29,7 @@ python3 -m v9pro2 --raw    # com os bytes enviados/recebidos
 python3 -m v9pro2 --set prompt-volume 10   # 1–16
 python3 -m v9pro2 --set eq-mode 1          # 0–2
 python3 -m v9pro2 --set auto-shutdown 30   # 15, 30, 45 ou 0 (nunca)
+python3 -m v9pro2 --set eq-gains 2:2,3.5,-3.5,5.5,1.5,3,2,2.5,1,-1   # perfil:10 ganhos em dB
 ```
 
 `--set` envia um único comando de uma lista fechada e relê o valor; nunca reset nem OTA.

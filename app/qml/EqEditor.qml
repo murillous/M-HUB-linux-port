@@ -6,7 +6,7 @@ import "eqpath.js" as EqPath
 
 // EQ editor that replaces the "Common parameters" page, like "Edit EQ" in the MCHOSE HUB:
 // header with the mode, chart pane on the left, preset library on the right.
-// Edits stay local until HID writes are enabled.
+// Edits are written to the headset once the curve rests (no Apply button, like the original).
 Item {
     id: editor
 
@@ -14,7 +14,10 @@ Item {
     property var modes: []
     property int modeIndex: 0
     property int activeMode: -1
+    /// Headset connected: edits are sent through `writeGains`; otherwise they stay local.
+    property bool canWrite: false
     signal collapse()
+    signal writeGains(int mode, var gains)
 
     property var undoStack: []
     property var redoStack: []
@@ -62,7 +65,19 @@ Item {
         chart.setValues(v, true)
     }
 
-    onModeIndexChanged: load(true)
+    // Debounced so a drag sends one packet; values in 0.1 dB steps like the headset.
+    Timer {
+        id: writeTimer
+        interval: 400
+        onTriggered: if (editor.dirty && editor.canWrite)
+            editor.writeGains(editor.modeIndex, chart.values.map(v => Math.round(v * 10) / 10))
+    }
+    Connections {
+        target: chart
+        function onValuesChanged() { if (editor.dirty) writeTimer.restart() }
+    }
+
+    onModeIndexChanged: { writeTimer.stop(); load(true) }
     Component.onCompleted: load(false)
 
     // Own presets for the 10 onboard bands (45 Hz … 12 kHz). Not MCHOSE's official presets.
@@ -248,7 +263,7 @@ Item {
             anchors.bottomMargin: 20
             width: parent.width
             wrapMode: Text.WordWrap
-            text: editor.dirty ? Lang.tr("eq.localOnly") : ""
+            text: !editor.dirty ? "" : editor.canWrite ? Lang.tr("eq.saving") : Lang.tr("eq.localOnly")
             font.family: Theme.font
             font.pixelSize: 12
             color: Theme.textFaint

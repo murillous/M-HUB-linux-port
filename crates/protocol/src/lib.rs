@@ -25,6 +25,8 @@ pub const GET_PROMPT_VOLUME: u8 = 13;
 pub const GET_AUTO_SHUTDOWN: u8 = 14;
 
 pub const SET_EQ_MODE: u8 = 1;
+/// No ack: confirm by reading GET_EQ_STATE back.
+pub const SET_EQ_GAINS: u8 = 18;
 pub const SET_AUTO_SHUTDOWN: u8 = 26;
 pub const SET_PROMPT_VOLUME: u8 = 33;
 
@@ -35,6 +37,9 @@ pub const OTA_DONGLE: u8 = 1;
 pub const EQ_ALL_POINTS: u8 = 255;
 pub const EQ_MODE_COUNT: u8 = 3;
 pub const PROMPT_VOLUME_MAX: u8 = 16;
+pub const EQ_BANDS: usize = 10;
+/// ±12 dB in tenths of dB.
+pub const EQ_GAIN_LIMIT: i16 = 120;
 /// Minutes offered by the vendor UI; 0 = never.
 pub const AUTO_SHUTDOWN_CHOICES: [u16; 4] = [15, 30, 45, 0];
 
@@ -116,6 +121,8 @@ pub enum Write {
     EqMode(u8),
     PromptVolume(u8),
     AutoShutdown(u16),
+    /// Gains of every band of one mode, in tenths of dB.
+    EqGains { mode: u8, tenths: [i16; EQ_BANDS] },
 }
 
 impl Write {
@@ -128,6 +135,13 @@ impl Write {
             }
             Write::AutoShutdown(m) if AUTO_SHUTDOWN_CHOICES.contains(&m) => {
                 Some((SET_AUTO_SHUTDOWN, m.to_be_bytes().to_vec()))
+            }
+            Write::EqGains { mode, tenths }
+                if mode < EQ_MODE_COUNT && tenths.iter().all(|t| t.abs() <= EQ_GAIN_LIMIT) =>
+            {
+                let mut payload = vec![mode, EQ_BANDS as u8];
+                payload.extend(tenths.iter().flat_map(|t| t.to_be_bytes()));
+                Some((SET_EQ_GAINS, payload))
             }
             _ => None,
         }
@@ -328,7 +342,13 @@ mod tests {
         let (cmd, payload) = Write::AutoShutdown(45).command().unwrap();
         assert_eq!(build(SET, cmd, &payload, false)[..9], h("aa 01 00 03 00 02 1a 00 2d")[..]);
         assert_eq!(Write::EqMode(0).command(), Some((SET_EQ_MODE, vec![0])));
-        for bad in [Write::EqMode(3), Write::PromptVolume(0), Write::PromptVolume(17), Write::AutoShutdown(20)] {
+        // sent to the headset on 2026-10-19 (mode 2, band 1 = 3.0 dB), confirmed by reading back
+        let tenths = [30, 35, -35, 55, 15, 30, 20, 25, 10, -10];
+        let (cmd, payload) = Write::EqGains { mode: 2, tenths }.command().unwrap();
+        assert_eq!(build(SET, cmd, &payload, false)[..12], h("aa 01 00 17 00 02 12 02 0a 00 1e 00")[..]);
+        assert_eq!(payload[6..8], [0xff, 0xdd]);
+        let loud = Write::EqGains { mode: 0, tenths: [121; EQ_BANDS] };
+        for bad in [Write::EqMode(3), Write::PromptVolume(0), Write::PromptVolume(17), Write::AutoShutdown(20), loud] {
             assert_eq!(bad.command(), None);
         }
     }

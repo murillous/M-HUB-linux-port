@@ -72,6 +72,10 @@ gravado; a releitura confirma. Exemplos reais:
 `>> aa 01 00 02 00 02 21 0b` → `<< aa 01 01 02 00 04 21 0b 2d` (prompt 11);
 `>> aa 01 00 02 00 02 01 00` → `<< aa 01 01 02 00 04 01 00 06` (perfil 0);
 `>> aa 01 00 03 00 02 1a 00 2d` → `<< aa 01 01 03 00 04 1a 00 2d 31` (45 min).
+O cmd 18 (ganhos do EQ) **não manda ack**, como no código oficial (`setPEQAllGain` usa só
+`sendReportOnce`); a releitura por `GET_EQ_STATE` mostrou o ganho novo:
+`>> aa 01 00 17 00 02 12 02 0a 00 1e 00 23 ff dd …` (perfil 2, banda 1 = 3,0 dB).
+O app oficial grava os ganhos, depois o nome (24) e por fim ativa o perfil (1, sem esperar ack).
 Todos os valores foram restaurados depois do teste.
 A interface HID é a coleção de vendor `usage_page 0xff07 / usage 0x222`, interface 3, que
 declara input e output de 63 bytes nos reports `0x55` e `0x4D`.
@@ -86,7 +90,7 @@ declara input e output de 63 bytes nos reports `0x55` e `0x4D`.
 | 13 | GET_PROMPT_VOLUME | Request | `[]` | `[volume]` |
 | 14 | GET_AUTO_SHUTDOWN | Request | `[]` | `[min_hi, min_lo]` — minutos ociosos; `0` = nunca |
 | 16 | SET_PEQ_ALL | Set | **[?]** (constante declarada, sem uso) | — |
-| 18 | (set PEQ gains) | Set | `[mode, n, (g_hi, g_lo)×n]`, `g = round(gain_dB × 10)` int16, −12…+12 dB | — |
+| 18 | (set PEQ gains) | Set | `[mode, n, (g_hi, g_lo)×n]`, `g = round(gain_dB × 10)` int16, −12…+12 dB | sem ack; conferir relendo — **validado** |
 | 24 | (set EQ mode name) | Set | `[mode, nome UTF-8 ≤ 54 bytes]` | — |
 | 25 | (restaurar EQ padrão) | Set | `[mode]` | — |
 | 26 | SET_AUTO_SHUTDOWN | Set | `[min_hi, min_lo]`; a UI oferece 15, 30, 45 e 0 (nunca) | ack Notify: igual ao cmd 14 — **validado** |

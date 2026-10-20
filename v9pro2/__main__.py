@@ -2,6 +2,7 @@
 
 Uso: python -m v9pro2 [--raw]
      python -m v9pro2 --set prompt-volume|eq-mode|auto-shutdown VALOR [--raw]
+     python -m v9pro2 --set eq-gains MODO:G1,G2,…,G10 [--raw]   (dB, −12…+12)
 
 Sem --set só envia as leituras de READS. Com --set envia um único comando da lista WRITES
 e relê o valor; nunca FACTORY_RESET nem OTA.
@@ -51,7 +52,15 @@ WRITES = {
     "prompt-volume": (P.SET_PROMPT_VOLUME, P.encode_set_prompt_volume, "prompt_volume"),
     "eq-mode": (P.SET_EQ_MODE, P.encode_set_eq_mode, "current_eq_mode"),
     "auto-shutdown": (P.SET_AUTO_SHUTDOWN, P.encode_set_auto_shutdown, "auto_shutdown"),
+    "eq-gains": (P.SET_EQ_GAINS, lambda v: P.encode_set_eq_gains(*v), None),
 }
+
+
+def parse_value(name, text):
+    if name != "eq-gains":
+        return int(text)
+    mode, gains = text.split(":")
+    return int(mode), [float(g) for g in gains.split(",")]
 
 
 def find_device():
@@ -118,6 +127,7 @@ def write(dev, name, value, raw):
     """Envia um Set de WRITES; espera o ack Notify (se vier) e relê o valor."""
     cmd, encode, label = WRITES[name]
     payload = encode(value)
+    label = label or f"eq_state[{value[0]}]"
     print(f"{label} before: {read(dev, label, raw)}")
     ack = transact(dev, P.SET, cmd, payload, raw=raw, ack=True)
     print("ack:", ack[0].hex(" ") if ack else "none")
@@ -140,7 +150,7 @@ def main():
     print(f"{info['product_string']}  {P.VID:04x}:{info['product_id']:04x}")
     try:
         if args.set:
-            write(dev, args.set[0], int(args.set[1]), args.raw)
+            write(dev, args.set[0], parse_value(*args.set), args.raw)
             return
         for label, cmd_type, cmd, payload, decode, match, complete in READS:
             if args.raw:
