@@ -12,12 +12,12 @@ Ao iniciar uma sessão nova, o usuário manda: **"vamos continuar de onde paramo
 5. Ao final da sessão: atualizar `docs/PROGRESSO.md` (status/pendências) e, se mudar o fluxo,
    este arquivo. Commitar com mensagem em português, sem linha de coautoria.
 
-## Onde paramos (2026-10-20, sessão 6)
+## Onde paramos (2026-10-21, sessão 7)
 
-- Volume/Microfone confirmados no Fedora. AI NR do THX identificado como DeepFilterNet3; NR e
-  retorno do mic ligados no app (`app/src/micfx.rs`, PipeWire).
-- **Próximo passo:** usuário testar no Fedora o NR (`python3 tools/install-deepfilter.py`) e
-  a latência do retorno; depois nivelamento e clareza do mic. Ver `docs/PROGRESSO.md`.
+- Usuário confirmou no Fedora: NR, retorno do mic, slider da notificação e auto-desligamento.
+- Em andamento: **nivelamento e clareza do mic**. Ghidra 12.1.4 instalado para o REA (ver
+  "Driver THX"); próximo passo é abrir `thx_mchose_v9pro2_apo4.dll` no REA e achar a cadeia do
+  mic e o compressor ssDRC. Ver `docs/PROGRESSO.md`.
 - Testes: `cargo test --workspace` (e `python -m unittest discover -s tests -t .`).
 - CLI no hardware: `python -m v9pro2 [--set prompt-volume|eq-mode|auto-shutdown N | eq-gains M:G1,…,G10 | eq-name M:NOME]` (precisa de
   `hidapi` num venv do scratchpad).
@@ -69,9 +69,10 @@ Pontos de referência encontrados (nomes mudam a cada build da MCHOSE):
 
 Fica em `C:\Windows\System32\DriverStore\FileRepository\thx_mchose_v9pro2_apo4.inf_*`
 (APO, `_rs.dll` = libDF, `_nr_model.dat` = tar.gz do DeepFilterNet3) e `thx_mchose_v9pro2_svc.inf_*`
-(`_props.dat` é um zip com as definições e presets). O REA não tem backend de disassembly neste
-Windows (Ghidra só como código em `C:\repos\ghidra-master`); use `pefile` + `capstone` num venv do
-scratchpad (`pip install pefile==2024.8.26 capstone==5.0.3`).
+(`_props.dat` é um zip com as definições e presets). Desde a sessão 7 o REA usa o Ghidra 12.1.4
+em `C:\Users\muril\tools\ghidra_12.1.4_PUBLIC` (`GHIDRA_INSTALL_DIR` no `env` do servidor `rea` em
+`~/.claude.json`; reiniciar o Claude Code depois de mudar). Alternativa: `pefile` + `capstone` num
+venv do scratchpad (`pip install pefile==2024.8.26 capstone==5.0.3`).
 
 ### Baixar o shell das telas do headset (customPage)
 

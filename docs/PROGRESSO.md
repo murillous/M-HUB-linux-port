@@ -1,6 +1,6 @@
 # Progresso do port
 
-Última atualização: 2026-10-20 (sessão 6)
+Última atualização: 2026-10-21 (sessão 7)
 
 Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI em inglês com opção de português (ver `CLAUDE.md`).
 
@@ -11,10 +11,10 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 | **EQ** (3 perfis onboard "Game 1/2/3", ganhos −12…+12 dB, nome) | HID report `0x55` | Leitura validada; **troca de perfil (1), ganhos (18) e nome (24) validados e no app** (testados pelo usuário); restaurar (25) pendente | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
 | **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]**. **Sliders e mudo no app, confirmados pelo usuário no Fedora** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
-| **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
-| **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. **AI NR = DeepFilterNet3** (descoberto no APO); parâmetros de todos os efeitos extraídos. **NR e retorno do mic no app** (`micfx.rs`), falta testar no Fedora; nivelamento e clareza pendentes | [03 §3](03-mapa-de-settings.md#como-o-thx-implementa-os-efeitos-de-microfone-sessão-6-obs) |
+| **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider), **confirmado no Fedora** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. **AI NR = DeepFilterNet3** (descoberto no APO); parâmetros de todos os efeitos extraídos. **NR e retorno do mic no app** (`micfx.rs`), **confirmados no Fedora**; nivelamento e clareza em andamento | [03 §3](03-mapa-de-settings.md#como-o-thx-implementa-os-efeitos-de-microfone-sessão-6-obs) |
 | **Playback settings** (brilho, virtual bass, volume inteligente, clareza de voz) | DSP do runtime THX no Windows | Nada em HID. Linux: PipeWire filter-chain/EasyEffects | [03 §3](03-mapa-de-settings.md#speaker-settings-playback) |
-| **Other settings**: auto-desligamento | HID `GET/SET_AUTO_SHUTDOWN` (14/26), u16 minutos | **Leitura e escrita validadas**; no app (menu 15/30/45/nunca) | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
+| **Other settings**: auto-desligamento | HID `GET/SET_AUTO_SHUTDOWN` (14/26), u16 minutos | **Leitura e escrita validadas**; no app (menu 15/30/45/nunca), **confirmado no Fedora** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Other settings**: bateria / dormindo | HID `GET_BATTERY_SLEEP` (11) + notify 34 | **Leitura validada** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Other settings**: restaurar padrões | HID `FACTORY_RESET` (27) | Payload conhecido — **não usar** sem confirmação | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | Versão de firmware (leitura) | HID `OtaRequest` + `0x80` | **Validado** (dongle `0033`, headset `0031`) | [02 §7a](02-protocolo-hid-v9-pro-2.md#7a-consulta-de-versão--via-hid-obs) |
@@ -71,11 +71,11 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 
 ## Pendências (em ordem)
 
-1. Testar no Fedora a redução de ruído (instalar o plugin, ligar, gravar com e sem) e o
-   retorno do mic (latência percebida, estalos; `pw-top` com e sem o `52-…-lowlatency.conf`).
-   Se der erro, a nota no card mostra o fim do log (`$XDG_RUNTIME_DIR/mchose-v9/*.log`).
-   Falta confirmar também slider da notificação, troca de modo e menu do desligamento.
-2. Nivelamento e clareza do mic: clareza com biquads do filter-chain (EQ de 10 bandas com os
+1. Confirmar no Fedora a troca de modo de som pelo app (NR, retorno do mic, slider da
+   notificação e auto-desligamento confirmados na sessão 7).
+2. **(em andamento, sessão 7)** Nivelamento e clareza do mic: entender no APO (REA + Ghidra) a
+   ordem da cadeia, o compressor ssDRC (joelho `width`, detector, interpolação do `drcScale`) e os
+   filtros da clareza. Clareza com biquads do filter-chain (EQ de 10 bandas com os
    máximos do THX × nível); nivelamento precisa de compressor (LADSPA/LV2, ex. `lsp-plugins`
    ou `swh-plugins` no Fedora). Encadear com o NR numa só fonte virtual.
 3. Restaurar EQ de fábrica (25), com confirmação. Hoje "Restaurar padrão" no editor grava tudo
