@@ -1,6 +1,6 @@
 # Progresso do port
 
-Última atualização: 2026-10-21 (sessão 7)
+Última atualização: 2026-10-21 (sessão 8)
 
 Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI em inglês com opção de português (ver `CLAUDE.md`).
 
@@ -12,7 +12,7 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 | EQ de 10 bandas do PC | DSP no Windows (`osConfLib.dll`/APO) | Não portável direto; substituir por PipeWire/EasyEffects | [02 §6](02-protocolo-hid-v9-pro-2.md#6-dois-eqs-diferentes) |
 | **Volume** (fone e mic, mudo) | Mixer do endpoint USB Audio do Windows | Linux: ALSA/PipeWire nativo; precisa de `linux/51-mchose-v9pro2.conf` (soft-mixer: a faixa em dB do firmware é errada) **[obs]**. **Sliders e mudo no app, confirmados pelo usuário no Fedora** | [03 §3](03-mapa-de-settings.md#3-cada-setting-onde-roda-e-como-portar) |
 | **Notificação sonora** (volume do prompt) | HID `GET/SET_PROMPT_VOLUME` (13/33), 1–16 | **Leitura e escrita validadas**; no app (slider), **confirmado no Fedora** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
-| **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. **AI NR = DeepFilterNet3** (descoberto no APO); parâmetros de todos os efeitos extraídos. **NR e retorno do mic no app** (`micfx.rs`), **confirmados no Fedora**; nivelamento e clareza em andamento | [03 §3](03-mapa-de-settings.md#como-o-thx-implementa-os-efeitos-de-microfone-sessão-6-obs) |
+| **Microfone** / **Microphone settings** (nivelamento, clareza, AI NR, Magic Voice, Mic Listen) | DSP do runtime THX no Windows + "Ouvir este dispositivo" | Nada em HID. **AI NR = DeepFilterNet3** (descoberto no APO); parâmetros de todos os efeitos extraídos. **NR e retorno do mic no app** (`micfx.rs`), **confirmados no Fedora**. Cadeia e compressor ssDRC descompilados (Ghidra); **nivelamento implementado como plugin LADSPA próprio** (`crates/micdrc`), falta ligar no app; clareza = 10 picos com Q 0,707 | [03 §3](03-mapa-de-settings.md#como-o-thx-implementa-os-efeitos-de-microfone-sessão-6-obs) |
 | **Playback settings** (brilho, virtual bass, volume inteligente, clareza de voz) | DSP do runtime THX no Windows | Nada em HID. Linux: PipeWire filter-chain/EasyEffects | [03 §3](03-mapa-de-settings.md#speaker-settings-playback) |
 | **Other settings**: auto-desligamento | HID `GET/SET_AUTO_SHUTDOWN` (14/26), u16 minutos | **Leitura e escrita validadas**; no app (menu 15/30/45/nunca), **confirmado no Fedora** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
 | **Other settings**: bateria / dormindo | HID `GET_BATTERY_SLEEP` (11) + notify 34 | **Leitura validada** | [02 §4](02-protocolo-hid-v9-pro-2.md#4-comandos-de-eq--configuração-eq_hid_cmd-obs) |
@@ -66,6 +66,12 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
    fonte com NR e pede 512 (pedido do usuário: ouvir o efeito, aceitando mais latência); e
    `linux/52-mchose-v9pro2-lowlatency.conf` opcional (sem modo batch, período de 64). Cada
    efeito é um `pipewire -c` destacado, com pid/log em `$XDG_RUNTIME_DIR/mchose-v9/`.
+11. **Nivelamento do mic** (sessão 8): o usuário confirmou NR, retorno do mic, notificação e
+   auto-desligamento no Fedora. O REA estoura o tempo no APO; com o Ghidra headless direto
+   saíram a ordem da cadeia do mic, a clareza (10 picos, Q 0,707) e o compressor ssDRC inteiro
+   (detector de pico, joelho suave, suavização do ganho, interpolação por nível, limitador).
+   O usuário escolheu um plugin próprio: `crates/micdrc` reproduz o kernel e expõe o LADSPA
+   `leveling` (8 testes).
 5. Ferramenta de leitura `python -m v9pro2` (hidapi; `hidraw` no Linux) validada no hardware
    pelo Windows, com o MCHOSE HUB aberto. Testes do protocolo com bytes reais em `tests/`.
 
@@ -73,11 +79,13 @@ Alvo: **Fedora** (o notebook do usuário está no 44; o app já rodou lá). UI e
 
 1. Confirmar no Fedora a troca de modo de som pelo app (NR, retorno do mic, slider da
    notificação e auto-desligamento confirmados na sessão 7).
-2. **(em andamento, sessão 7)** Nivelamento e clareza do mic: entender no APO (REA + Ghidra) a
-   ordem da cadeia, o compressor ssDRC (joelho `width`, detector, interpolação do `drcScale`) e os
-   filtros da clareza. Clareza com biquads do filter-chain (EQ de 10 bandas com os
-   máximos do THX × nível); nivelamento precisa de compressor (LADSPA/LV2, ex. `lsp-plugins`
-   ou `swh-plugins` no Fedora). Encadear com o NR numa só fonte virtual.
+2. **(em andamento)** Ligar nivelamento e clareza no app. Feito na sessão 8: cadeia e ssDRC
+   entendidos (doc 03, "Cadeia do mic e o compressor ssDRC") e o plugin `crates/micdrc`
+   (`libmchose_v9_micdrc.so`, label `leveling`, portas Level 0–100 e Enabled; limitador sempre
+   ligado), escolhido pelo usuário em vez de swh/lsp. Falta: build no Fedora e instalar o `.so`
+   em `~/.local/lib/ladspa`; um só filter-chain na ordem do THX (clareza = 10 `bq_peaking` com
+   Q 0,707 → NR opcional → `leveling`); mudar Level e ganhos ao vivo (`pw-cli set-param … Props`)
+   sem reiniciar; ligar os cartões `micLevel`/`micClarity`.
 3. Restaurar EQ de fábrica (25), com confirmação. Hoje "Restaurar padrão" no editor grava tudo
    em 0 dB (plano), não o EQ de fábrica do perfil.
 4. Bandeja (`ksni`) e serviço em segundo plano (religar os efeitos do mic no login).

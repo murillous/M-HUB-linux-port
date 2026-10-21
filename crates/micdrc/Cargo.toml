@@ -1,0 +1,12 @@
+[package]
+name = "mchose-micdrc"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Mic volume leveling of the MCHOSE V9 Pro 2 (THX ssDRC) as a LADSPA plugin"
+
+[lib]
+name = "mchose_v9_micdrc"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]

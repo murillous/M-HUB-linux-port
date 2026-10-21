@@ -341,6 +341,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mchose-micdrc"
+version = "0.1.0"
+
+[[package]]
 name = "mchose-v9"
 version = "0.1.0"
 dependencies = [

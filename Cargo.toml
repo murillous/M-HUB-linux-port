@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/protocol", "app"]
+members = ["crates/protocol", "crates/micdrc", "app"]
 
 [workspace.package]
 edition = "2024"

@@ -98,6 +98,40 @@ Arquivos do driver THX no DriverStore (`thx_mchose_v9pro2_apo4.inf_*` e `thx_mch
   - Existe `mic_sidetone_enabled/level` no runtime, mas a UI do V9 Pro 2 não usa; o "Mic
     Listen" é `MicListen.dll` ("Ouvir este dispositivo").
 
+#### Cadeia do mic e o compressor ssDRC (sessão 7, Ghidra no APO) **[obs]**
+
+O REA não serve para esta DLL (18 MB): a análise inicial passa dos 330 s de limite e reinicia a
+cada chamada. Funcionou o Ghidra headless direto (`analyzeHeadless` + scripts próprios no
+scratchpad, sem limite de tempo), com as classes recuperadas pelo RTTI.
+
+- **Ordem dos blocos** (`MicrophoneSignalFlow`, criação em sequência): conversão de taxa →
+  VoiceGate → passa-altas (`mic_high_pass_filter_*`) → ganho (`mic_gain_db`) → EQ do usuário
+  (`mic_eq_band_*`) → **clareza** → **NR (DeepFilterNet)** → **nivelamento** → **limitador**
+  (`LastResortDrcProcessingBlock`) → conversão de taxa. Ou seja: clareza antes do NR, nivelamento
+  depois dele.
+- **Clareza** (`MicVoiceClarityProcessingBlock`): 10 biquads tipo PEAK em 31, 62, 125, 250, 500,
+  1k, 2k, 4k, 8k, 16 kHz, **Q = 0,7071**, ganho = nível × máximo da banda.
+- **Nivelamento** (`MicVolumeLevelingProcessingBlock` → `SlidingScaleDRC<double>` →
+  `MultibandDRC` com 1 banda e filtro passthrough). Nível da UI × 100 → inteiro 0–100. O DRC de
+  cada nível sai da tabela `drcScale`: entrada exata se existir, senão **interpolação linear** dos
+  7 campos entre os níveis vizinhos. Mudança de nível em rampa (0→100 em 200 ms); liga/desliga
+  com crossfade de 100 ms. Sem config externa usa um padrão embutido (ataque 0,1 ms, release
+  100–500 ms); o V9 Pro 2 usa o do `props.dat` (tabela acima).
+- **Kernel do DRC** (`thx_drc.h`), todo em log natural (dB × ln10/20), amostra a amostra:
+  ```
+  x   = ln|preGain · in|                          (detector de pico, sem RMS)
+  y   = x                                         se x < T − W/2
+      = T + (x − T)/R                             se x > T + W/2
+      = x + (1/R − 1)·(x − T + W/2)² / (2W)       no joelho (W = "width")
+  g   = y − x
+  g_s = g_s + α·(g − g_s),  α = 1 − exp(−1000 / (fs · t_ms)),  t = attack se g < g_s, senão decay
+  out = in · exp(g_s + gain)                      ("gain" = makeup; "preGain" opcional, padrão 0)
+  ```
+  Campos do struct: threshold, width, ratio, preGain, gain, attack, decay. Parâmetros novos
+  entram em rampa.
+- **Limitador**: o mesmo kernel com ratio 7, threshold −1 dB, width 0,5, ataque 0,1 ms, decay
+  100 ms, ganho 0.
+
 Port no Linux (`app/src/micfx.rs`): NR = plugin LADSPA oficial do DeepFilterNet (v0.5.6, modelo
 de baixa latência do mesmo projeto, ~20 ms) num `filter-chain` com fonte virtual
 `mchose_v9_mic_nr` que vira a fonte padrão; monitoramento = `module-loopback` para o fone, do
